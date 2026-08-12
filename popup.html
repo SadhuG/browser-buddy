@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Browser Buddy</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">B</span><span>Browser Buddy</span></div>
+      </header>
+      <nav class="tab-nav" aria-label="Browser Buddy features">
+        <button class="app-tab is-active" data-panel="youtube" type="button">YouTube</button>
+        <button class="app-tab" data-panel="tabs" type="button">Tabs</button>
+      </nav>
+
+      <section id="youtube" class="panel is-active" aria-label="YouTube controls">
+        <div class="panel-heading youtube-heading"><div><p class="eyebrow">WATCH BETTER</p><h1>YouTube</h1></div><span class="youtube-badge">YT</span></div>
+        <article class="card speed-card">
+          <div class="card-label-row"><span>Playback speed</span><strong><span id="speedValue">1.00</span>×</strong></div>
+          <div class="slider-row"><button id="btnMinus" class="round-button" aria-label="Decrease speed" type="button">−</button><input id="speedSlider" type="range" min="0.25" max="4" step="0.05" value="1"><button id="btnPlus" class="round-button" aria-label="Increase speed" type="button">+</button></div>
+          <div class="presets" aria-label="Speed presets"><button data-speed="1" type="button">1×</button><button data-speed="1.15" type="button">1.15×</button><button data-speed="1.25" type="button">1.25×</button><button data-speed="1.35" type="button">1.35×</button><button data-speed="1.5" type="button">1.5×</button></div>
+        </article>
+        <article class="card setting-row"><div><h2>Tutorial mode</h2><p id="tutorialDescription">Auto-pause video when tabs switch.</p></div><label class="switch"><input id="tutorialMode" type="checkbox"><span></span></label></article>
+        <article class="card setting-row"><div><h2>Subscription clean</h2><p id="subscriptionCleanDescription">Hide Shorts and other fluff on your Subscriptions feed.</p></div><label class="switch"><input id="subscriptionCleanMode" type="checkbox"><span></span></label></article>
+      </section>
+
+      <section id="tabs" class="panel" aria-label="Tab tools">
+        <div id="tabsHome">
+          <div class="panel-heading"><div><p class="eyebrow">BROWSER TOOLS</p><h1>Tabs</h1></div></div>
+          <article class="tool-card">
+            <div class="tool-icon">≡</div>
+            <div><h2>Remove Duplicates</h2><p>Find matching tabs, keep one, and close the rest without touching pinned tabs.</p></div>
+            <button id="launchDuplicateTool" class="tool-launch" type="button">Open</button>
+          </article>
+        </div>
+        <div id="duplicateTool" hidden>
+        <button id="backToTools" class="back-button" type="button">← All tab tools</button>
+        <div class="panel-heading"><div><p class="eyebrow">TAB HYGIENE</p><h1>Duplicates</h1></div><span id="duplicateCount" class="count-badge">0</span></div>
+        <div class="scope-row"><span>Search scope</span><label class="scope-switch"><input id="allWindowsToggle" type="checkbox"><span></span><b>This window</b><b>All windows</b></label></div>
+        <label class="search-field"><span class="search-icon">⌕</span><input id="tabSearch" type="search" placeholder="Search title or URL" autocomplete="off"></label>
+        <p id="tabSummary" class="summary">Looking for duplicate tabs…</p>
+        <div id="variantWarnings" class="warning-list" hidden></div>
+        <div id="duplicateGroups" class="duplicate-groups" aria-live="polite"></div>
+        <div id="emptyState" class="empty-state" hidden><span>✓</span><h2>No duplicates found</h2><p>Your selected tabs are nice and tidy.</p></div>
+        <button id="removeAll" class="remove-all" type="button" disabled>Remove all duplicates</button>
+        </div>
+      </section>
+    </main>
+    <div id="confirmDialog" class="dialog-backdrop" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><p class="eyebrow">CONFIRM CLEANUP</p><h2 id="confirmTitle">Remove duplicate tabs?</h2><p id="confirmText"></p><div class="dialog-actions"><button id="cancelRemove" class="secondary-button" type="button">Cancel</button><button id="confirmRemove" class="danger-button" type="button">Remove duplicates</button></div></section></div>
+    <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="undoRemove" type="button">Undo</button></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
