@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Browser Buddy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A focused browser companion for YouTube and tab hygiene.",
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["*://*.youtube.com/*", "*://music.youtube.com/*"],
+  "host_permissions": [
+    "*://*.youtube.com/*", "*://music.youtube.com/*",
+    "*://*.amazon.com/*", "*://*.amazon.ca/*", "*://*.amazon.com.mx/*", "*://*.amazon.com.br/*", "*://*.amazon.co.uk/*", "*://*.amazon.de/*", "*://*.amazon.fr/*", "*://*.amazon.es/*", "*://*.amazon.it/*", "*://*.amazon.nl/*", "*://*.amazon.se/*", "*://*.amazon.pl/*", "*://*.amazon.com.tr/*", "*://*.amazon.ae/*", "*://*.amazon.sa/*", "*://*.amazon.eg/*", "*://*.amazon.in/*", "*://*.amazon.sg/*", "*://*.amazon.com.au/*", "*://*.amazon.co.jp/*", "*://*.amazon.com.be/*", "*://*.amazon.ie/*", "*://*.amazon.co.za/*"
+  ],
   "action": { "default_popup": "popup.html", "default_title": "Browser Buddy" },
   "background": { "service_worker": "background.js" },
   "content_scripts": [{
-    "matches": ["*://*.youtube.com/*", "*://music.youtube.com/*"],
+    "matches": [
+      "*://*.youtube.com/*", "*://music.youtube.com/*",
+      "*://*.amazon.com/*", "*://*.amazon.ca/*", "*://*.amazon.com.mx/*", "*://*.amazon.com.br/*", "*://*.amazon.co.uk/*", "*://*.amazon.de/*", "*://*.amazon.fr/*", "*://*.amazon.es/*", "*://*.amazon.it/*", "*://*.amazon.nl/*", "*://*.amazon.se/*", "*://*.amazon.pl/*", "*://*.amazon.com.tr/*", "*://*.amazon.ae/*", "*://*.amazon.sa/*", "*://*.amazon.eg/*", "*://*.amazon.in/*", "*://*.amazon.sg/*", "*://*.amazon.com.au/*", "*://*.amazon.co.jp/*", "*://*.amazon.com.be/*", "*://*.amazon.ie/*", "*://*.amazon.co.za/*"
+    ],
     "js": ["content.js"],
     "run_at": "document_end"
   }]

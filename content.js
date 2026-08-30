@@ -1,6 +1,7 @@
 let playbackSpeed = 1;
 let tutorialMode = false;
 let subscriptionCleanMode = false;
+let hideAmazonCart = false;
 let currentVideoId = getVideoId(location.href);
 let wasAutoPaused = false;
 let lastVideo = null;
@@ -8,24 +9,35 @@ let lastUrl = location.href;
 const hiddenAttribute = 'data-browser-buddy-hidden';
 let hiddenNodes = [];
 
-chrome.storage.local.get(['playbackSpeed', 'tutorialMode', 'subscriptionCleanMode'], (values) => {
+// Keep Amazon page content flush with the viewport without depending on
+// Amazon's generated body-class names.
+if (/(^|\.)amazon\./.test(location.hostname)) {
+  const amazonBodyPaddingStyle = document.createElement('style');
+  amazonBodyPaddingStyle.textContent = 'body { padding-right: 0px !important; } .nav-ewc-arrow { display: none !important; }';
+  document.documentElement.appendChild(amazonBodyPaddingStyle);
+}
+
+chrome.storage.local.get(['playbackSpeed', 'tutorialMode', 'subscriptionCleanMode', 'hideAmazonCart'], (values) => {
   playbackSpeed = values.playbackSpeed || 1;
   tutorialMode = !!values.tutorialMode;
   subscriptionCleanMode = !!values.subscriptionCleanMode;
-  applySettings(); scheduleSubscriptionClean();
+  hideAmazonCart = !!values.hideAmazonCart;
+  applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if (changes.playbackSpeed) playbackSpeed = changes.playbackSpeed.newValue || 1;
   if (changes.tutorialMode) tutorialMode = !!changes.tutorialMode.newValue;
   if (changes.subscriptionCleanMode) subscriptionCleanMode = !!changes.subscriptionCleanMode.newValue;
-  applySettings(); scheduleSubscriptionClean();
+  if (changes.hideAmazonCart) hideAmazonCart = !!changes.hideAmazonCart.newValue;
+  applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
 });
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'FOCUS_LOST') pauseVideo();
   if (message.type === 'FOCUS_GAINED') resumeVideo();
   if (message.type === 'TUTORIAL_MODE_UPDATED') tutorialMode = !!message.enabled;
   if (message.type === 'SUBSCRIPTION_CLEAN_UPDATED') { subscriptionCleanMode = !!message.enabled; scheduleSubscriptionClean(); }
+  if (message.type === 'AMAZON_CART_STATUS') return Promise.resolve({ found: amazonCartSidebarFound() });
 });
 document.addEventListener('visibilitychange', () => document.hidden ? pauseVideo() : resumeVideo());
 window.addEventListener('blur', pauseVideo); window.addEventListener('focus', resumeVideo);
@@ -55,5 +67,24 @@ function applySubscriptionClean() {
     if (section.getAttribute(hiddenAttribute) !== '1' && shouldHide(section)) { section.style.display = 'none'; section.setAttribute(hiddenAttribute, '1'); hiddenNodes.push(section); }
   });
 }
-new MutationObserver(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); wasAutoPaused = false; } applySettings(); scheduleSubscriptionClean(); }).observe(document.documentElement, { childList:true, subtree:true });
-setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); } applySettings(); scheduleSubscriptionClean(); }, 1000);
+new MutationObserver(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); wasAutoPaused = false; } applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); }).observe(document.documentElement, { childList:true, subtree:true });
+setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); } applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); }, 1000);
+
+const amazonCartSelectors = [
+  '#nav-flyout-ewc', '#ewc-smart-wagon-desktop-sideSheet',
+  '#nav-flyout-cart', '#attach-sidesheet', '#attach-sidesheet-container',
+  '#sc-subtotal-right', '#sc-buy-box', '[data-feature-name="cart-sidebar"]', '[data-testid="cart-sidebar"]'
+];
+const amazonCartHiddenAttribute = 'data-browser-buddy-amazon-cart-hidden';
+let amazonCartScheduled = false;
+function isAmazonPage() { return /(^|\.)amazon\./.test(location.hostname); }
+function amazonCartNodes() { return isAmazonPage() ? amazonCartSelectors.flatMap((selector) => [...document.querySelectorAll(selector)]) : []; }
+function amazonCartSidebarFound() { return amazonCartNodes().length > 0; }
+function scheduleAmazonCartHide() { if (amazonCartScheduled) return; amazonCartScheduled = true; requestAnimationFrame(applyAmazonCartHide); }
+function applyAmazonCartHide() {
+  amazonCartScheduled = false;
+  amazonCartNodes().forEach((node) => {
+    if (hideAmazonCart) { node.style.setProperty('display', 'none', 'important'); node.setAttribute(amazonCartHiddenAttribute, '1'); }
+    else if (node.getAttribute(amazonCartHiddenAttribute) === '1') { node.style.removeProperty('display'); node.removeAttribute(amazonCartHiddenAttribute); }
+  });
+}

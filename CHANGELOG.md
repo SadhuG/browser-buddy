@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.2
+
+Release: 2026-08-30
+
+### Added
+
+- Hide Amazon cart toggle in Tabs. It is off by default, applies immediately to open Amazon tabs, and warns in the popup when no supported cart sidebar is found.
+
+### Changed
+
+- Remove Amazon's docked-panel right padding and hide its cart arrow to keep the page layout clean.
+
 ## v1.0.1
 
 Release: 2026-08-30

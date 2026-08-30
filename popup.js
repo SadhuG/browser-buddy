@@ -7,7 +7,7 @@ async function init() {
   bindNavigation();
   bindYoutubeControls();
   bindTabControls();
-  await loadYoutubeState();
+  await Promise.all([loadYoutubeState(), loadAmazonCartState()]);
 }
 
 function bindNavigation() {
@@ -53,6 +53,32 @@ async function saveTutorialPreference(event) {
 async function saveSubscriptionPreference(event) {
   await chrome.storage.local.set({ subscriptionCleanMode: event.target.checked });
 }
+
+function bindAmazonCartControl() {
+  $('#hideAmazonCart').addEventListener('change', saveAmazonCartPreference);
+}
+async function loadAmazonCartState() {
+  bindAmazonCartControl();
+  const { hideAmazonCart = false } = await chrome.storage.local.get('hideAmazonCart');
+  $('#hideAmazonCart').checked = hideAmazonCart;
+  if (hideAmazonCart) await updateAmazonCartWarning();
+}
+async function saveAmazonCartPreference(event) {
+  await chrome.storage.local.set({ hideAmazonCart: event.target.checked });
+  await updateAmazonCartWarning();
+}
+async function updateAmazonCartWarning() {
+  const warning = $('#amazonCartWarning');
+  warning.hidden = true;
+  if (!$('#hideAmazonCart').checked) return;
+  const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!activeTab || !isAmazonUrl(activeTab.url)) return;
+  try {
+    const result = await chrome.tabs.sendMessage(activeTab.id, { type: 'AMAZON_CART_STATUS' });
+    if (!result?.found) { warning.textContent = 'Cart sidebar not found on this page.'; warning.hidden = false; }
+  } catch (_) { warning.textContent = 'Unable to check this Amazon page.'; warning.hidden = false; }
+}
+function isAmazonUrl(value) { try { return /(^|\.)amazon\.(com|ca|com\.mx|com\.br|co\.uk|de|fr|es|it|nl|se|pl|com\.tr|ae|sa|eg|in|sg|com\.au|co\.jp|com\.be|ie|co\.za)$/.test(new URL(value).hostname); } catch (_) { return false; } }
 
 function bindTabControls() {
   $('#launchDuplicateTool').addEventListener('click', openDuplicateTool);
