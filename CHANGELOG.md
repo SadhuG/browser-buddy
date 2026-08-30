@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.1
+
+Release: 2026-08-30
+
+### Changed
+
+- Explicitly support YouTube Music URLs alongside YouTube URLs.
+
 ## v1.0.0
 
 Release: 2026-08-12

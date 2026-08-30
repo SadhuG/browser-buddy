@@ -54,7 +54,7 @@ Browser Buddy uses:
 
 - `tabs` to list, focus, create, and close tabs for the duplicate-tab tool.
 - `storage` to save playback speed and the two global YouTube preferences locally in the browser.
-- `*://*.youtube.com/*` only to run the YouTube helper on YouTube pages.
+- `*://*.youtube.com/*` and `*://music.youtube.com/*` only to run the helper on YouTube and YouTube Music pages.
 
 The extension does not send browsing data or settings to a remote service. Tab URLs and titles are read only while the popup is open and are used locally to render duplicate groups.
 
