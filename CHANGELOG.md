@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.3
+
+Release: 2026-08-30
+
+### Fixed
+
+- Exclude YouTube Music from the content script so Browser Buddy never changes its playback speed.
+
 ## v1.0.2
 
 Release: 2026-08-30
@@ -11,14 +19,6 @@ Release: 2026-08-30
 ### Changed
 
 - Remove Amazon's docked-panel right padding and hide its cart arrow to keep the page layout clean.
-
-## v1.0.1
-
-Release: 2026-08-30
-
-### Changed
-
-- Explicitly support YouTube Music URLs alongside YouTube URLs.
 
 ## v1.0.0
 

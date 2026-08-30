@@ -11,7 +11,7 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a minimal 
 - Playback speed from 0.25× to 4×, with quick presets.
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
 - Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf.
-- Settings can be changed from any browser tab. They are only applied on relevant YouTube pages.
+- Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
 
 ### Tabs
 
@@ -57,7 +57,7 @@ Browser Buddy uses:
 
 - `tabs` to list, focus, create, and close tabs for the duplicate-tab tool.
 - `storage` to save playback speed and global preferences locally in the browser.
-- YouTube, YouTube Music, and Amazon storefront host access only to run the helper on those pages.
+- YouTube and Amazon storefront host access only to run the helper on those pages. YouTube Music is excluded from the helper.
 
 The extension does not send browsing data or settings to a remote service. Tab URLs and titles are read only while the popup is open and are used locally to render duplicate groups.
 
