@@ -38,12 +38,50 @@ test('Escape dismisses the confirmation without closing tabs', async ({ context,
   expect(await dupeTabs(popup)).toHaveLength(2);
 });
 
-test('a single duplicate can be closed from its row', async ({ context, popup }) => {
+test('a single duplicate closes in place with Undo in its row, not a toast', async ({ context, popup }) => {
   await openPages(context, urls('/a', '/a', '/a'));
   await openTool(popup);
   await popup.locator('.close-tab').first().click();
-  await expect(popup.locator('#toast')).toBeVisible();
+  const closed = popup.locator('.tab-row.is-closed');
+  await expect(closed).toHaveCount(1);
+  await expect(closed).toContainText('Closed');
+  await expect(closed.locator('.undo-link')).toBeFocused();
+  await expect(popup.locator('#toast')).toBeHidden();
+  await expect(popup.locator('#duplicateCount')).toHaveText(/^1 /);
   expect(await dupeTabs(popup)).toHaveLength(2);
+});
+
+test('the closed row stays when its group has no duplicates left', async ({ context, popup }) => {
+  await openPages(context, urls('/a', '/a'));
+  await openTool(popup);
+  await popup.locator('.close-tab').click();
+  await expect(popup.locator('.tab-row.is-closed')).toHaveCount(1);
+  await expect(popup.locator('#emptyState')).toBeHidden();
+  await expect(popup.locator('#removeAll')).toBeDisabled();
+});
+
+test('Undo in the row reopens that tab', async ({ context, popup }) => {
+  await openPages(context, urls('/a', '/a', '/a'));
+  await openTool(popup);
+  await popup.locator('.close-tab').first().click();
+  await popup.locator('.tab-row.is-closed .undo-link').click();
+  await expect(popup.locator('.tab-row.is-closed')).toHaveCount(0);
+  await expect.poll(async () => (await dupeTabs(popup)).length).toBe(3);
+  await expect(popup.locator('#duplicateCount')).toHaveText(/^2 /);
+});
+
+test('a closed row folds away after eight seconds', async ({ context, popup }) => {
+  await popup.clock.install();
+  await popup.reload();
+  await openPages(context, urls('/a', '/a'));
+  await openTool(popup);
+  await popup.locator('.close-tab').click();
+  await expect(popup.locator('.tab-row.is-closed')).toHaveCount(1);
+  await popup.clock.fastForward(7900);
+  await expect(popup.locator('.tab-row.is-closed')).toHaveCount(1);
+  await popup.clock.fastForward(400);
+  await expect(popup.locator('.tab-row.is-closed')).toHaveCount(0);
+  await expect(popup.locator('#emptyTitle')).toHaveText('No duplicates left');
 });
 
 test('pinned duplicates are never offered for removal', async ({ context, popup }) => {

@@ -1,5 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false };
+const state = { scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false, closedRows: [] };
+const UNDO_MS = 8000;
+const FOLD_MS = 180;
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -124,6 +126,8 @@ function showTabsHome() {
   $('#tabsHome').hidden = false;
   $('#duplicateTool').hidden = true;
   document.body.classList.remove('is-tool-open');
+  state.closedRows.forEach((closed) => clearTimeout(closed.timer));
+  state.closedRows = [];
   hideRemoveConfirmation();
 }
 async function setScope(all) {
@@ -136,7 +140,8 @@ async function setScope(all) {
 
 async function refreshTabs() {
   try {
-    state.tabs = await chrome.tabs.query(state.scopeAll ? {} : { currentWindow: true });
+    // A tab reopened by Undo has only pendingUrl until it starts loading.
+    state.tabs = (await chrome.tabs.query(state.scopeAll ? {} : { currentWindow: true })).map((tab) => ({ ...tab, url: tab.url || tab.pendingUrl }));
     state.groups = buildDuplicateGroups(state.tabs);
     renderGroups();
   } catch (_) { $('#tabSummary').textContent = 'Unable to read browser tabs.'; }
@@ -144,7 +149,8 @@ async function refreshTabs() {
 
 function renderGroups() {
   const query = $('#tabSearch').value.trim().toLowerCase();
-  const groups = state.groups.filter((group) => group.tabs.some((tab) => `${tab.title} ${tab.url}`.toLowerCase().includes(query)));
+  const matches = (tab) => `${tab.title} ${tab.url}`.toLowerCase().includes(query);
+  const groups = displayGroups().filter((group) => group.items.some((item) => matches(item.tab)));
   const closeCount = uniqueRemoveIds(state.groups).length;
   const chip = $('#duplicateCount');
   chip.textContent = `${closeCount} to close`;
@@ -157,13 +163,30 @@ function renderGroups() {
   renderEmptyState(closeCount, groups.length, query);
   renderVariantWarnings();
 }
+// Live duplicate groups, plus closed rows still inside their Undo window. A group whose
+// last extra copy was just closed stays visible until its closed rows fold away.
+function displayGroups() {
+  const groups = state.groups.map((group) => ({ key: group.key, keepId: group.keepId, items: group.tabs.map((tab) => ({ tab })) }));
+  state.closedRows.forEach((closed) => {
+    let group = groups.find((candidate) => candidate.key === closed.key);
+    if (!group) {
+      const live = state.tabs.filter((tab) => !tab.pinned && tab.url && normalizeUrl(tab.url) === closed.key);
+      group = { key: closed.key, keepId: live[0]?.id, items: live.map((tab) => ({ tab })) };
+      groups.push(group);
+    }
+    const after = group.items.findIndex((item) => item.tab.id === closed.afterId);
+    group.items.splice(after + 1, 0, { tab: closed.tab, closed });
+  });
+  return groups;
+}
 function renderEmptyState(closeCount, visibleGroups, query) {
   const scope = state.scopeAll ? 'any window' : 'this window';
   let title = '';
   let text = '';
-  if (closeCount && !visibleGroups) { title = 'No matches'; text = `No duplicate tabs match “${query}”.`; }
-  else if (!closeCount && state.justClosed) { title = 'No duplicates left'; text = state.scopeAll ? 'Every tab is open once.' : 'Every tab in this window is open once.'; }
-  else if (!closeCount) { title = `No duplicates in ${scope}`; text = `${state.scopeAll ? 'Every tab' : 'Every tab here'} is open once.\nPinned tabs are never counted.`; }
+  if (visibleGroups) title = '';
+  else if (query && (closeCount || state.closedRows.length)) { title = 'No matches'; text = `No duplicate tabs match “${query}”.`; }
+  else if (state.justClosed) { title = 'No duplicates left'; text = state.scopeAll ? 'Every tab is open once.' : 'Every tab in this window is open once.'; }
+  else { title = `No duplicates in ${scope}`; text = `${state.scopeAll ? 'Every tab' : 'Every tab here'} is open once.\nPinned tabs are never counted.`; }
   $('#emptyState').hidden = !title;
   $('#emptyTitle').textContent = title;
   $('#emptyText').textContent = text;
@@ -173,24 +196,39 @@ function plural(count) { return count === 1 ? '' : 's'; }
 
 function groupCard(group) {
   const card = element('article', 'group');
-  const keptActive = group.tabs.find((tab) => tab.id === group.keepId)?.active;
+  const live = group.items.filter((item) => !item.closed);
+  const keptActive = live.find((item) => item.tab.id === group.keepId)?.tab.active;
   const head = element('div', 'group-head');
-  head.append(element('b', '', `${group.tabs.length} matching tabs`), element('small', '', `keeping the ${keptActive ? 'active' : 'earliest'} tab`));
+  head.append(element('b', '', `${live.length} matching tab${plural(live.length)}`), element('small', '', `keeping the ${keptActive ? 'active' : 'earliest'} tab`));
   card.append(head);
-  group.tabs.forEach((tab) => {
-    const kept = tab.id === group.keepId;
-    const row = element('div', `tab-row${kept ? ' is-kept' : ''}`);
-    const tabButton = element('button', 'tab-link'); tabButton.type = 'button'; tabButton.title = tab.url;
-    const copy = element('span', 'tab-copy');
-    copy.append(element('span', 'tab-title', tab.title || 'Untitled tab'), element('span', 'tab-url', shortUrl(tab.url)));
-    tabButton.append(favicon(tab), copy);
-    tabButton.addEventListener('click', () => chrome.tabs.update(tab.id, { active: true }).then(() => chrome.windows.update(tab.windowId, { focused: true })));
-    row.append(tabButton);
-    if (kept) row.append(element('span', 'keep-badge', 'keep'));
-    else { const close = element('button', 'close-tab', '×'); close.type = 'button'; close.setAttribute('aria-label', `Close ${tab.title || 'tab'}`); close.addEventListener('click', () => removeTabs([tab])); row.append(close); }
-    card.append(row);
-  });
+  group.items.forEach(({ tab, closed }) => card.append(closed ? closedRow(closed) : tabRow(tab, tab.id === group.keepId)));
   return card;
+}
+function tabRow(tab, kept) {
+  const row = element('div', `tab-row${kept ? ' is-kept' : ''}`);
+  const tabButton = element('button', 'tab-link'); tabButton.type = 'button'; tabButton.title = tab.url;
+  const copy = element('span', 'tab-copy');
+  copy.append(element('span', 'tab-title', tab.title || 'Untitled tab'), element('span', 'tab-url', shortUrl(tab.url)));
+  tabButton.append(favicon(tab), copy);
+  tabButton.addEventListener('click', () => chrome.tabs.update(tab.id, { active: true }).then(() => chrome.windows.update(tab.windowId, { focused: true })));
+  row.append(tabButton);
+  if (kept) row.append(element('span', 'keep-badge', 'keep'));
+  else { const close = element('button', 'close-tab', '×'); close.type = 'button'; close.setAttribute('aria-label', `Close ${tab.title || 'tab'}`); close.addEventListener('click', () => closeTabInRow(tab)); row.append(close); }
+  return row;
+}
+function closedRow(closed) {
+  const row = element('div', 'tab-row is-closed');
+  row.dataset.closedId = closed.tab.id;
+  const copy = element('span', 'closed-copy');
+  copy.append(element('b', '', 'Closed'), element('span', '', closed.tab.title || 'Untitled tab'));
+  const undo = element('button', 'undo-link', 'Undo'); undo.type = 'button';
+  undo.setAttribute('aria-label', `Undo closing ${closed.tab.title || 'tab'}`);
+  undo.addEventListener('click', () => undoClosedRow(closed));
+  const countdown = element('span', 'row-countdown');
+  countdown.style.animationDuration = `${UNDO_MS}ms`;
+  countdown.style.animationDelay = `${closed.closedAt - Date.now()}ms`;
+  row.append(copy, undo, countdown);
+  return row;
 }
 function favicon(tab) {
   const holder = element('span', 'favicon');
@@ -223,7 +261,31 @@ async function removeTabs(tabs) {
   state.justClosed = true;
   await refreshTabs(); showToast(`Closed ${valid.length} duplicate tab${plural(valid.length)}.`, true);
 }
-function showToast(message, canUndo) { clearTimeout(state.undoTimer); $('#toastText').textContent = message; $('#undoRemove').hidden = !canUndo; $('#toast').hidden = false; state.undoTimer = setTimeout(() => { $('#toast').hidden = true; state.undoTabs = []; }, 8000); }
+// A single closed tab stays in place as a "Closed" row with its own Undo, so the
+// action sits under the cursor. Bulk removal has no one row to attach to and uses the toast.
+async function closeTabInRow(tab) {
+  const group = displayGroups().find((candidate) => candidate.items.some((item) => item.tab.id === tab.id));
+  const position = group ? group.items.findIndex((item) => item.tab.id === tab.id) : -1;
+  await chrome.tabs.remove(tab.id);
+  const closed = { tab: { ...tab }, key: normalizeUrl(tab.url), afterId: position > 0 ? group.items[position - 1].tab.id : null, closedAt: Date.now() };
+  closed.timer = setTimeout(() => foldClosedRow(closed), UNDO_MS);
+  state.closedRows.push(closed);
+  state.justClosed = true;
+  await refreshTabs();
+  closedRowElement(closed)?.querySelector('.undo-link').focus();
+}
+function closedRowElement(closed) { return document.querySelector(`[data-closed-id="${closed.tab.id}"]`); }
+function foldClosedRow(closed) {
+  closedRowElement(closed)?.classList.add('is-folding');
+  setTimeout(() => { state.closedRows = state.closedRows.filter((row) => row !== closed); renderGroups(); }, FOLD_MS);
+}
+async function undoClosedRow(closed) {
+  clearTimeout(closed.timer);
+  state.closedRows = state.closedRows.filter((row) => row !== closed);
+  await chrome.tabs.create({ windowId: closed.tab.windowId, index: closed.tab.index, url: closed.tab.url, active: false });
+  await refreshTabs();
+}
+function showToast(message, canUndo) { clearTimeout(state.undoTimer); $('#toastText').textContent = message; $('#undoRemove').hidden = !canUndo; $('#toast').hidden = false; state.undoTimer = setTimeout(() => { $('#toast').hidden = true; state.undoTabs = []; }, UNDO_MS); }
 async function undoRemoval() { const grouped = new Map(); state.undoTabs.forEach((tab) => { if (!grouped.has(tab.windowId)) grouped.set(tab.windowId, []); grouped.get(tab.windowId).push(tab); }); for (const [windowId, tabs] of grouped) { for (const tab of tabs.sort((a, b) => a.index - b.index)) await chrome.tabs.create({ windowId, url: tab.url, index: tab.index, active: false }); } state.undoTabs = []; state.justClosed = false; $('#toast').hidden = true; await refreshTabs(); }
 
 function getYoutubeVideoId(value) { try { const url = new URL(value); return url.hostname.includes('youtube.com') && url.pathname === '/watch' ? url.searchParams.get('v') : null; } catch (_) { return null; } }

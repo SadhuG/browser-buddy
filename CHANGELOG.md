@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Closing a single duplicate no longer shows a floating message that covered the bottom of the list. The tab stays in place as a "Closed" row with its own Undo and an eight-second countdown line, then folds away. Bulk removal still uses a single message with Undo.
+
+### Fixed
+
+- Tabs reopened by Undo are counted again immediately, before they finish loading.
+
 ## v1.1.0
 
 Release: 2026-10-04

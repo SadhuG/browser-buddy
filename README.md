@@ -29,7 +29,8 @@ The Tabs section opens to a tools landing page. Select **Open** on **Close dupli
 - Shows the browser tab title in each result. Clicking a title focuses that tab and its window.
 - Keeps the active tab in a duplicate group, or otherwise the earliest tab. Pinned tabs are never removed.
 - Lets you close a single duplicate or remove every removable duplicate in the selected scope.
-- Requests confirmation before a bulk removal and offers Undo for eight seconds afterward.
+- Closing a single duplicate leaves a dimmed "Closed" row in its place with Undo right under the cursor. A thin line counts down eight seconds, then the row folds away.
+- Requests confirmation before a bulk removal and offers Undo in a single message for eight seconds afterward.
 
 ## Install locally
 
