@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null };
+const state = { scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false };
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -12,10 +12,11 @@ async function init() {
 
 function bindNavigation() {
   document.querySelectorAll('.app-tab').forEach((button) => button.addEventListener('click', () => {
-    document.querySelectorAll('.app-tab, .panel').forEach((el) => el.classList.remove('is-active'));
+    document.querySelectorAll('.app-tab, .view').forEach((el) => el.classList.remove('is-active'));
+    document.querySelectorAll('.app-tab').forEach((tab) => tab.setAttribute('aria-pressed', String(tab === button)));
     button.classList.add('is-active');
     $(`#${button.dataset.panel}`).classList.add('is-active');
-    if (button.dataset.panel === 'tabs') showTabsHome();
+    showTabsHome();
   }));
 }
 
@@ -46,7 +47,20 @@ function updateSpeed(speed) {
   updateSpeedUI(value);
   chrome.storage.local.set({ playbackSpeed: value });
 }
-function updateSpeedUI(speed) { $('#speedSlider').value = speed; $('#speedValue').textContent = speed.toFixed(2); }
+function updateSpeedUI(speed) {
+  $('#speedSlider').value = speed;
+  $('#speedValue').textContent = speed.toFixed(2);
+  $('.speed-bar').style.setProperty('--pct', (speed - .25) / 3.75);
+  const delta = Math.round((speed - 1) * 100);
+  const chip = $('#speedDelta');
+  chip.textContent = delta ? `${delta > 0 ? '+' : '−'}${Math.abs(delta)}%` : 'normal';
+  chip.classList.toggle('is-hot', !!delta);
+  document.querySelectorAll('.presets button').forEach((button) => {
+    const active = Number(button.dataset.speed) === speed;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
 async function saveTutorialPreference(event) {
   await chrome.storage.local.set({ tutorialMode: event.target.checked });
 }
@@ -75,31 +89,49 @@ async function updateAmazonCartWarning() {
   if (!activeTab || !isAmazonUrl(activeTab.url)) return;
   try {
     const result = await chrome.tabs.sendMessage(activeTab.id, { type: 'AMAZON_CART_STATUS' });
-    if (!result?.found) { warning.textContent = 'Cart sidebar not found on this page.'; warning.hidden = false; }
-  } catch (_) { warning.textContent = 'Unable to check this Amazon page.'; warning.hidden = false; }
+    if (!result?.found) showAmazonCartWarning('No cart sidebar on this page.', 'It will be hidden on pages that show one, like search and product pages.');
+  } catch (_) { showAmazonCartWarning('Can’t check this Amazon page.', 'Reload the tab, then open Browser Buddy again.'); }
+}
+function showAmazonCartWarning(title, text) {
+  $('#amazonCartWarningTitle').textContent = title;
+  $('#amazonCartWarningText').textContent = text;
+  $('#amazonCartWarning').hidden = false;
 }
 function isAmazonUrl(value) { try { return /(^|\.)amazon\.(com|ca|com\.mx|com\.br|co\.uk|de|fr|es|it|nl|se|pl|com\.tr|ae|sa|eg|in|sg|com\.au|co\.jp|com\.be|ie|co\.za)$/.test(new URL(value).hostname); } catch (_) { return false; } }
 
 function bindTabControls() {
   $('#launchDuplicateTool').addEventListener('click', openDuplicateTool);
   $('#backToTools').addEventListener('click', showTabsHome);
-  $('#allWindowsToggle').addEventListener('change', async (event) => { state.scopeAll = event.target.checked; $('.scope-switch').classList.toggle('is-all', state.scopeAll); await refreshTabs(); });
+  $('#scopeWindow').addEventListener('click', () => setScope(false));
+  $('#scopeAll').addEventListener('click', () => setScope(true));
+  $('#searchAllWindows').addEventListener('click', () => setScope(true));
   $('#tabSearch').addEventListener('input', renderGroups);
   $('#removeAll').addEventListener('click', showRemoveConfirmation);
   $('#cancelRemove').addEventListener('click', hideRemoveConfirmation);
   $('#confirmRemove').addEventListener('click', removeAllDuplicates);
   $('#undoRemove').addEventListener('click', undoRemoval);
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !$('#confirmDialog').hidden) { event.preventDefault(); hideRemoveConfirmation(); } });
 }
 
 async function openDuplicateTool() {
   $('#tabsHome').hidden = true;
   $('#duplicateTool').hidden = false;
+  document.body.classList.add('is-tool-open');
+  state.justClosed = false;
   await refreshTabs();
 }
 function showTabsHome() {
   $('#tabsHome').hidden = false;
   $('#duplicateTool').hidden = true;
+  document.body.classList.remove('is-tool-open');
   hideRemoveConfirmation();
+}
+async function setScope(all) {
+  if (state.scopeAll === all) return;
+  state.scopeAll = all;
+  state.justClosed = false;
+  [['#scopeWindow', !all], ['#scopeAll', all]].forEach(([selector, active]) => { $(selector).classList.toggle('is-active', active); $(selector).setAttribute('aria-pressed', String(active)); });
+  await refreshTabs();
 }
 
 async function refreshTabs() {
@@ -110,79 +142,89 @@ async function refreshTabs() {
   } catch (_) { $('#tabSummary').textContent = 'Unable to read browser tabs.'; }
 }
 
-function normalizeUrl(value) {
-  try {
-    const url = new URL(value);
-    url.hash = '';
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid'].forEach((name) => url.searchParams.delete(name));
-    if (url.pathname.length > 1) url.pathname = url.pathname.replace(/\/+$/, '');
-    return url.toString();
-  } catch (_) { return value || ''; }
-}
-function variantKey(value) {
-  try { const url = new URL(value); return `${url.origin}${url.pathname.replace(/\/+$/, '')}`; } catch (_) { return value || ''; }
-}
-function buildDuplicateGroups(tabs) {
-  const buckets = new Map();
-  tabs.filter((tab) => !tab.pinned && tab.url).forEach((tab) => {
-    const key = normalizeUrl(tab.url);
-    if (!buckets.has(key)) buckets.set(key, []);
-    buckets.get(key).push(tab);
-  });
-  return [...buckets.entries()].filter(([, tabsInGroup]) => tabsInGroup.length > 1).map(([key, tabsInGroup]) => ({ key, tabs: tabsInGroup, keepId: chooseKeptTab(tabsInGroup) }));
-}
-function chooseKeptTab(tabs) { return (tabs.find((tab) => tab.active) || [...tabs].sort((a, b) => a.index - b.index)[0]).id; }
-function uniqueRemoveIds(groups) { return groups.flatMap((group) => group.tabs.filter((tab) => tab.id !== group.keepId).map((tab) => tab.id)); }
-
 function renderGroups() {
   const query = $('#tabSearch').value.trim().toLowerCase();
   const groups = state.groups.filter((group) => group.tabs.some((tab) => `${tab.title} ${tab.url}`.toLowerCase().includes(query)));
-  const closeCount = uniqueRemoveIds(groups).length;
-  $('#duplicateCount').textContent = closeCount;
-  $('#tabSummary').textContent = closeCount ? `${closeCount} extra tab${closeCount === 1 ? '' : 's'} across ${groups.length} duplicate group${groups.length === 1 ? '' : 's'}. Pinned tabs are protected.` : 'No removable duplicates in this scope.';
+  const closeCount = uniqueRemoveIds(state.groups).length;
+  const chip = $('#duplicateCount');
+  chip.textContent = `${closeCount} to close`;
+  chip.classList.toggle('is-hot', !!closeCount);
+  $('#tabSummary').textContent = `${closeCount} extra tab${plural(closeCount)} in ${state.groups.length} group${plural(state.groups.length)}. Pinned tabs are never closed.`;
+  $('#tabSummary').hidden = !closeCount;
   $('#removeAll').disabled = !closeCount;
+  $('#removeAll').textContent = closeCount ? `Close ${closeCount} duplicate${plural(closeCount)}` : 'Close duplicates';
   $('#duplicateGroups').replaceChildren(...groups.map(groupCard));
-  $('#emptyState').hidden = !!closeCount;
+  renderEmptyState(closeCount, groups.length, query);
   renderVariantWarnings();
 }
+function renderEmptyState(closeCount, visibleGroups, query) {
+  const scope = state.scopeAll ? 'any window' : 'this window';
+  let title = '';
+  let text = '';
+  if (closeCount && !visibleGroups) { title = 'No matches'; text = `No duplicate tabs match “${query}”.`; }
+  else if (!closeCount && state.justClosed) { title = 'No duplicates left'; text = state.scopeAll ? 'Every tab is open once.' : 'Every tab in this window is open once.'; }
+  else if (!closeCount) { title = `No duplicates in ${scope}`; text = `${state.scopeAll ? 'Every tab' : 'Every tab here'} is open once.\nPinned tabs are never counted.`; }
+  $('#emptyState').hidden = !title;
+  $('#emptyTitle').textContent = title;
+  $('#emptyText').textContent = text;
+  $('#searchAllWindows').hidden = !(title && !closeCount && !state.justClosed && !state.scopeAll);
+}
+function plural(count) { return count === 1 ? '' : 's'; }
 
 function groupCard(group) {
-  const card = document.createElement('article'); card.className = 'duplicate-card';
-  const title = document.createElement('div'); title.className = 'duplicate-card-title';
-  title.innerHTML = `<span>${group.tabs.length} matching tabs</span><small>Keeping ${group.tabs.find((tab) => tab.id === group.keepId)?.active ? 'active' : 'earliest'} tab</small>`;
-  card.append(title);
+  const card = element('article', 'group');
+  const keptActive = group.tabs.find((tab) => tab.id === group.keepId)?.active;
+  const head = element('div', 'group-head');
+  head.append(element('b', '', `${group.tabs.length} matching tabs`), element('small', '', `keeping the ${keptActive ? 'active' : 'earliest'} tab`));
+  card.append(head);
   group.tabs.forEach((tab) => {
-    const row = document.createElement('div'); row.className = `tab-row${tab.id === group.keepId ? ' kept' : ''}`;
-    const tabButton = document.createElement('button'); tabButton.className = 'tab-link'; tabButton.type = 'button'; tabButton.title = tab.url;
-    tabButton.innerHTML = `<span class="favicon">${tab.favIconUrl ? `<img src="${tab.favIconUrl}" alt="">` : '◻'}</span><span class="tab-copy"><b>${escapeHtml(tab.title || 'Untitled tab')}</b><small>${escapeHtml(shortUrl(tab.url))}</small></span>${tab.id === group.keepId ? '<em>Keep</em>' : ''}`;
-    tabButton.addEventListener('click', () => chrome.tabs.update(tab.id, { active: true }).then(() => chrome.windows.update(tab.windowId, { focused: true }))); row.append(tabButton);
-    if (tab.id !== group.keepId) { const close = document.createElement('button'); close.className = 'close-tab'; close.type = 'button'; close.setAttribute('aria-label', `Close ${tab.title || 'tab'}`); close.textContent = '×'; close.addEventListener('click', () => removeTabs([tab])); row.append(close); }
+    const kept = tab.id === group.keepId;
+    const row = element('div', `tab-row${kept ? ' is-kept' : ''}`);
+    const tabButton = element('button', 'tab-link'); tabButton.type = 'button'; tabButton.title = tab.url;
+    const copy = element('span', 'tab-copy');
+    copy.append(element('span', 'tab-title', tab.title || 'Untitled tab'), element('span', 'tab-url', shortUrl(tab.url)));
+    tabButton.append(favicon(tab), copy);
+    tabButton.addEventListener('click', () => chrome.tabs.update(tab.id, { active: true }).then(() => chrome.windows.update(tab.windowId, { focused: true })));
+    row.append(tabButton);
+    if (kept) row.append(element('span', 'keep-badge', 'keep'));
+    else { const close = element('button', 'close-tab', '×'); close.type = 'button'; close.setAttribute('aria-label', `Close ${tab.title || 'tab'}`); close.addEventListener('click', () => removeTabs([tab])); row.append(close); }
     card.append(row);
   });
   return card;
 }
+function favicon(tab) {
+  const holder = element('span', 'favicon');
+  const letter = () => { try { return new URL(tab.url).hostname.replace(/^www\./, '')[0]?.toUpperCase() || '·'; } catch (_) { return '·'; } };
+  if (tab.favIconUrl && /^https?:|^data:image\//.test(tab.favIconUrl)) {
+    const img = document.createElement('img'); img.alt = ''; img.src = tab.favIconUrl;
+    img.addEventListener('error', () => holder.replaceChildren(letter()));
+    holder.append(img);
+  } else holder.textContent = letter();
+  return holder;
+}
+function element(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
 function renderVariantWarnings() {
   const duplicateKeys = new Set(state.groups.map((group) => group.key));
   const variants = new Map();
   state.tabs.filter((tab) => !tab.pinned && tab.url && !duplicateKeys.has(normalizeUrl(tab.url))).forEach((tab) => { const key = variantKey(tab.url); if (!variants.has(key)) variants.set(key, []); variants.get(key).push(tab); });
-  const near = [...variants.values()].filter((tabs) => new Set(tabs.map((tab) => normalizeUrl(tab.url))).size > 1);
-  const holder = $('#variantWarnings'); holder.replaceChildren(); holder.hidden = !near.length;
-  near.slice(0, 3).forEach((tabs) => { const note = document.createElement('p'); note.textContent = `${tabs.length} URL variants are kept separate because their query parameters differ.`; holder.append(note); });
+  const count = [...variants.values()].filter((tabs) => new Set(tabs.map((tab) => normalizeUrl(tab.url))).size > 1).reduce((sum, tabs) => sum + tabs.length, 0);
+  $('#variantWarnings').hidden = !count;
+  $('#variantWarningText').textContent = `${count} URL variants stay open: their query parameters differ.`;
 }
 function shortUrl(value) { try { const url = new URL(value); return `${url.hostname}${url.pathname}${url.search}`; } catch (_) { return value; } }
-function escapeHtml(value) { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }
 
-function showRemoveConfirmation() { const ids = uniqueRemoveIds(state.groups); if (!ids.length) return; $('#confirmText').textContent = `This will close ${ids.length} duplicate tab${ids.length === 1 ? '' : 's'} and keep one tab from each group. Pinned tabs are never closed.`; $('#confirmDialog').hidden = false; }
+function showRemoveConfirmation() { const ids = uniqueRemoveIds(state.groups); if (!ids.length) return; $('#confirmTitle').textContent = `Close ${ids.length} duplicate tab${plural(ids.length)}?`; $('#confirmDialog').hidden = false; $('#confirmRemove').focus(); }
 function hideRemoveConfirmation() { $('#confirmDialog').hidden = true; }
 async function removeAllDuplicates() { hideRemoveConfirmation(); const ids = uniqueRemoveIds(state.groups); const tabs = state.groups.flatMap((group) => group.tabs.filter((tab) => ids.includes(tab.id))); await removeTabs(tabs); }
 async function removeTabs(tabs) {
   const valid = tabs.filter((tab) => tab?.id && !tab.pinned); if (!valid.length) return;
   state.undoTabs = valid.map((tab) => ({ url: tab.url, windowId: tab.windowId, index: tab.index }));
   await chrome.tabs.remove(valid.map((tab) => tab.id));
-  await refreshTabs(); showToast(`${valid.length} duplicate tab${valid.length === 1 ? '' : 's'} closed.`, true);
+  state.justClosed = true;
+  await refreshTabs(); showToast(`Closed ${valid.length} duplicate tab${plural(valid.length)}.`, true);
 }
 function showToast(message, canUndo) { clearTimeout(state.undoTimer); $('#toastText').textContent = message; $('#undoRemove').hidden = !canUndo; $('#toast').hidden = false; state.undoTimer = setTimeout(() => { $('#toast').hidden = true; state.undoTabs = []; }, 8000); }
-async function undoRemoval() { const grouped = new Map(); state.undoTabs.forEach((tab) => { if (!grouped.has(tab.windowId)) grouped.set(tab.windowId, []); grouped.get(tab.windowId).push(tab); }); for (const [windowId, tabs] of grouped) { for (const tab of tabs.sort((a, b) => a.index - b.index)) await chrome.tabs.create({ windowId, url: tab.url, index: tab.index, active: false }); } state.undoTabs = []; $('#toast').hidden = true; await refreshTabs(); }
+async function undoRemoval() { const grouped = new Map(); state.undoTabs.forEach((tab) => { if (!grouped.has(tab.windowId)) grouped.set(tab.windowId, []); grouped.get(tab.windowId).push(tab); }); for (const [windowId, tabs] of grouped) { for (const tab of tabs.sort((a, b) => a.index - b.index)) await chrome.tabs.create({ windowId, url: tab.url, index: tab.index, active: false }); } state.undoTabs = []; state.justClosed = false; $('#toast').hidden = true; await refreshTabs(); }
 
 function getYoutubeVideoId(value) { try { const url = new URL(value); return url.hostname.includes('youtube.com') && url.pathname === '/watch' ? url.searchParams.get('v') : null; } catch (_) { return null; } }
 function isSubscriptionsUrl(value) { try { const url = new URL(value); return url.hostname.includes('youtube.com') && url.pathname === '/feed/subscriptions'; } catch (_) { return false; } }

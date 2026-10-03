@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.1.0
+
+Release: 2026-10-04
+
+### Added
+
+- Automated tests: Node unit tests for duplicate-tab grouping, and Playwright end-to-end tests for duplicate removal, bulk confirmation and Undo. GitHub Actions runs them on every push and pull request.
+
+### Changed
+
+- Redesigned the popup: monospaced Azeret Mono type (bundled locally), square panels with breadcrumb headers, a large speed readout with a scale bar, and off/on segmented switches.
+- Duplicates shows a "to close" count, names the exact number on the close button, and asks for confirmation with the same count.
+- Empty duplicate results offer **Search all windows**; after closing, the list says no duplicates are left while Undo is available.
+- The Amazon cart note now explains that the cart will be hidden on pages that show one.
+
 ## v1.0.3
 
 Release: 2026-08-30

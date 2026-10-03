@@ -7,54 +7,115 @@
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
-    <main class="app-shell">
+    <main class="app">
       <header class="topbar">
-        <div class="brand"><span class="brand-mark">B</span><span>Browser Buddy</span></div>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">B</span><span>browser buddy</span></div>
+        <nav class="seg" aria-label="Browser Buddy features">
+          <button class="app-tab is-active" data-panel="youtube" type="button" aria-pressed="true">YouTube</button>
+          <button class="app-tab" data-panel="tabs" type="button" aria-pressed="false">Tabs</button>
+        </nav>
       </header>
-      <nav class="tab-nav" aria-label="Browser Buddy features">
-        <button class="app-tab is-active" data-panel="youtube" type="button">YouTube</button>
-        <button class="app-tab" data-panel="tabs" type="button">Tabs</button>
-      </nav>
 
-      <section id="youtube" class="panel is-active" aria-label="YouTube controls">
-        <div class="panel-heading youtube-heading"><div><p class="eyebrow">WATCH BETTER</p><h1>YouTube</h1></div><span class="youtube-badge">YT</span></div>
-        <article class="card speed-card">
-          <div class="card-label-row"><span>Playback speed</span><strong><span id="speedValue">1.00</span>×</strong></div>
-          <div class="slider-row"><button id="btnMinus" class="round-button" aria-label="Decrease speed" type="button">−</button><input id="speedSlider" type="range" min="0.25" max="4" step="0.05" value="1"><button id="btnPlus" class="round-button" aria-label="Increase speed" type="button">+</button></div>
-          <div class="presets" aria-label="Speed presets"><button data-speed="1" type="button">1×</button><button data-speed="1.15" type="button">1.15×</button><button data-speed="1.25" type="button">1.25×</button><button data-speed="1.35" type="button">1.35×</button><button data-speed="1.5" type="button">1.5×</button></div>
+      <section id="youtube" class="view is-active" aria-label="YouTube controls">
+        <article class="panel">
+          <div class="panel-head">
+            <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Playback speed</b></p>
+            <span id="speedDelta" class="chip">normal</span>
+          </div>
+          <div class="speed-body">
+            <div class="stats">
+              <div class="speed-readout"><p class="label">Speed</p><p class="speed-value"><span id="speedValue">1.00</span>×</p></div>
+              <div class="fine-step">
+                <p class="micro">Fine adjust ±0.05</p>
+                <div class="stepper"><button id="btnMinus" class="step-button" aria-label="Decrease speed" type="button">−</button><button id="btnPlus" class="step-button" aria-label="Increase speed" type="button">+</button></div>
+              </div>
+            </div>
+            <div class="speed-bar">
+              <div class="bar-track" aria-hidden="true"><span class="bar-fill"></span><span class="bar-hatch"></span></div>
+              <input id="speedSlider" type="range" min="0.25" max="4" step="0.05" value="1" aria-label="Playback speed">
+              <div class="bar-scale" aria-hidden="true"><span style="--at:0">0.25×</span><span style="--at:.2">1×</span><span style="--at:.4667">2×</span><span style="--at:.7333">3×</span><span style="--at:1">4×</span></div>
+            </div>
+            <div class="presets" aria-label="Speed presets"><button data-speed="1" type="button">1×</button><button data-speed="1.15" type="button">1.15×</button><button data-speed="1.25" type="button">1.25×</button><button data-speed="1.35" type="button">1.35×</button><button data-speed="1.5" type="button">1.5×</button></div>
+          </div>
         </article>
-        <article class="card setting-row"><div><h2>Tutorial mode</h2><p id="tutorialDescription">Auto-pause video when tabs switch.</p></div><label class="switch"><input id="tutorialMode" type="checkbox"><span></span></label></article>
-        <article class="card setting-row"><div><h2>Subscription clean</h2><p id="subscriptionCleanDescription">Hide Shorts and other fluff on your Subscriptions feed.</p></div><label class="switch"><input id="subscriptionCleanMode" type="checkbox"><span></span></label></article>
+
+        <article class="panel">
+          <div class="setting-row">
+            <div class="row-text"><h2 id="tutorialTitle">Tutorial mode</h2><p id="tutorialDescription">Pause on tab leave, play on return.</p></div>
+            <label class="toggle"><input id="tutorialMode" type="checkbox" aria-labelledby="tutorialTitle" aria-describedby="tutorialDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+          </div>
+          <div class="setting-row">
+            <div class="row-text"><h2 id="subscriptionCleanTitle">Subscription clean</h2><p id="subscriptionCleanDescription">Hide Shorts and “Most relevant” on Subscriptions.</p></div>
+            <label class="toggle"><input id="subscriptionCleanMode" type="checkbox" aria-labelledby="subscriptionCleanTitle" aria-describedby="subscriptionCleanDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+          </div>
+        </article>
       </section>
 
-      <section id="tabs" class="panel" aria-label="Tab tools">
-        <div id="tabsHome">
-          <div class="panel-heading"><div><p class="eyebrow">BROWSER TOOLS</p><h1>Tabs</h1></div></div>
-          <article class="tool-card">
-            <div class="tool-icon">≡</div>
-            <div><h2>Remove Duplicates</h2><p>Find matching tabs, keep one, and close the rest without touching pinned tabs.</p></div>
-            <button id="launchDuplicateTool" class="tool-launch" type="button">Open</button>
+      <section id="tabs" class="view" aria-label="Tab tools">
+        <div id="tabsHome" class="view-stack">
+          <article class="panel">
+            <div class="panel-head"><p class="crumb"><span>Tabs</span><span class="crumb-sep">/</span><b>Duplicates</b></p></div>
+            <div class="tool-row">
+              <div class="row-text"><h2>Close duplicate tabs</h2><p>Finds tabs open more than once, keeps one of each, closes the rest. Pinned tabs are never touched.</p></div>
+              <button id="launchDuplicateTool" class="button" type="button">Open</button>
+            </div>
           </article>
-          <article class="card setting-row amazon-cart-setting">
-            <div><h2>Hide Amazon cart</h2><p>Hide the cart sidebar across Amazon.</p><p id="amazonCartWarning" class="feature-warning" hidden></p></div>
-            <label class="switch"><input id="hideAmazonCart" type="checkbox"><span></span></label>
+          <article class="panel">
+            <div class="panel-head"><p class="crumb"><span>Amazon</span><span class="crumb-sep">/</span><b>Cart</b></p></div>
+            <div class="setting-row">
+              <div class="row-text"><h2 id="amazonCartTitle">Hide Amazon cart</h2><p id="amazonCartDescription">Hide the cart sidebar on every Amazon store.</p></div>
+              <label class="toggle"><input id="hideAmazonCart" type="checkbox" aria-labelledby="amazonCartTitle" aria-describedby="amazonCartDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+            </div>
+            <div id="amazonCartWarning" class="warning" role="status" hidden>
+              <span class="warning-dot" aria-hidden="true"></span>
+              <div><p id="amazonCartWarningTitle" class="warning-title"></p><p id="amazonCartWarningText" class="warning-text"></p></div>
+            </div>
           </article>
         </div>
-        <div id="duplicateTool" hidden>
-        <button id="backToTools" class="back-button" type="button">← All tab tools</button>
-        <div class="panel-heading"><div><p class="eyebrow">TAB HYGIENE</p><h1>Duplicates</h1></div><span id="duplicateCount" class="count-badge">0</span></div>
-        <div class="scope-row"><span>Search scope</span><label class="scope-switch"><input id="allWindowsToggle" type="checkbox"><span></span><b>This window</b><b>All windows</b></label></div>
-        <label class="search-field"><span class="search-icon">⌕</span><input id="tabSearch" type="search" placeholder="Search title or URL" autocomplete="off"></label>
-        <p id="tabSummary" class="summary">Looking for duplicate tabs…</p>
-        <div id="variantWarnings" class="warning-list" hidden></div>
-        <div id="duplicateGroups" class="duplicate-groups" aria-live="polite"></div>
-        <div id="emptyState" class="empty-state" hidden><span>✓</span><h2>No duplicates found</h2><p>Your selected tabs are nice and tidy.</p></div>
-        <button id="removeAll" class="remove-all" type="button" disabled>Remove all duplicates</button>
+
+        <div id="duplicateTool" class="dup-view" hidden>
+          <button id="backToTools" class="back-link" type="button">← Tab tools</button>
+          <article class="panel dup-panel">
+            <div class="panel-head">
+              <p class="crumb"><span>Tabs</span><span class="crumb-sep">/</span><b>Duplicates</b></p>
+              <span id="duplicateCount" class="chip">0 to close</span>
+            </div>
+            <div class="dup-controls">
+              <div class="scope-row">
+                <span class="label">Look in</span>
+                <div class="seg" role="group" aria-label="Search scope">
+                  <button id="scopeWindow" class="is-active" type="button" aria-pressed="true">This window</button>
+                  <button id="scopeAll" type="button" aria-pressed="false">All windows</button>
+                </div>
+              </div>
+              <label class="search-field">
+                <svg class="search-icon" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="4.6" cy="4.6" r="3.9" fill="none" stroke="currentColor" stroke-width="1.25"/><path d="M7.6 7.6 11 11" stroke="currentColor" stroke-width="1.25"/></svg>
+                <input id="tabSearch" type="search" placeholder="Search title or URL" autocomplete="off" aria-label="Search title or URL">
+              </label>
+            </div>
+            <p id="tabSummary" class="summary">Looking for duplicate tabs…</p>
+            <div id="variantWarnings" class="warning" hidden><span class="warning-dot" aria-hidden="true"></span><p id="variantWarningText" class="warning-title"></p></div>
+            <div id="duplicateGroups" class="groups" aria-live="polite"></div>
+            <div id="emptyState" class="empty-state" hidden>
+              <span class="empty-check" aria-hidden="true"><svg width="10" height="8" viewBox="0 0 10 8"><path d="M1 4.2 3.7 6.8 9 1.2" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></span>
+              <h2 id="emptyTitle">No duplicates in this window</h2>
+              <p id="emptyText">Every tab here is open once.</p>
+              <button id="searchAllWindows" class="button" type="button" hidden>Search all windows</button>
+            </div>
+          </article>
+          <button id="removeAll" class="primary-button" type="button" disabled>Close duplicates</button>
+          <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="undoRemove" type="button">Undo</button></div>
         </div>
       </section>
     </main>
-    <div id="confirmDialog" class="dialog-backdrop" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle"><p class="eyebrow">CONFIRM CLEANUP</p><h2 id="confirmTitle">Remove duplicate tabs?</h2><p id="confirmText"></p><div class="dialog-actions"><button id="cancelRemove" class="secondary-button" type="button">Cancel</button><button id="confirmRemove" class="danger-button" type="button">Remove duplicates</button></div></section></div>
-    <div id="toast" class="toast" role="status" hidden><span id="toastText"></span><button id="undoRemove" type="button">Undo</button></div>
+    <div id="confirmDialog" class="dialog-backdrop" hidden>
+      <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+        <h2 id="confirmTitle">Close duplicate tabs?</h2>
+        <p id="confirmText">One tab from each group stays open. Pinned tabs are never closed, and you can undo right after.</p>
+        <div class="dialog-actions"><button id="cancelRemove" class="button" type="button">Cancel</button><button id="confirmRemove" class="primary-button" type="button">Close tabs</button></div>
+      </section>
+    </div>
+    <script src="lib/duplicate-tabs.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

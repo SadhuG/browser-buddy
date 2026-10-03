@@ -1,2 +1,10 @@
 # Claude scratch space (Figma MCP exports, screenshots, temp files)
 .claude/scratch/
+
+# Plans
+docs/
+
+# Dev tooling
+node_modules/
+test-results/
+playwright-report/
