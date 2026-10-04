@@ -35,6 +35,14 @@ async function openPages(context, urls) {
   return pages;
 }
 
+// Serve a captured HTML file from tests/fixtures/ at a real-looking URL so the
+// content script runs on it as if it were the live site.
+const serveFixture = (context, url, file) =>
+  context.route(url, (route) =>
+    route.fulfill({ contentType: 'text/html; charset=utf-8', path: path.resolve(__dirname, '../fixtures', file) }));
+
+const setSetting = (popup, key, value) => popup.evaluate(([k, v]) => chrome.storage.local.set({ [k]: v }), [key, value]);
+
 const dupeTabs = (popup) => popup.evaluate(() => chrome.tabs.query({ url: 'https://dupes.test/*' }));
 
-module.exports = { test, expect, openPages, dupeTabs };
+module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting };

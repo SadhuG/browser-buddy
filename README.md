@@ -10,14 +10,15 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a dark, mo
 
 - Playback speed from 0.25× to 4×, with quick presets.
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
-- Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf.
+- Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf. Shorts shelves are recognized by page structure in any language; other shelves and videos are left alone.
 - Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
 
 ### Tabs
 
 The Tabs section opens to a tools landing page. Select **Open** on **Close duplicate tabs** to launch the cleanup workspace.
 
-- **Hide Amazon cart** is off by default. When enabled, it immediately hides Amazon's cart sidebar on supported Amazon storefronts and continues to hide it as the page updates. If no recognized sidebar is present on the active Amazon page, the popup shows an amber note explaining that the cart will be hidden on pages that show one.
+- **Hide Amazon cart** is off by default. When enabled, it immediately hides Amazon's cart sidebar on supported Amazon storefronts and continues to hide it as the page updates. If no recognized sidebar is present on the active Amazon page, the popup shows an amber note explaining that the cart will be hidden on pages that show one. The cart page's own Subtotal and Proceed to checkout box is never hidden.
+- The docked cart sidebar has been verified on amazon.com, amazon.co.uk, amazon.de, amazon.in and amazon.co.jp, on product, search results and "Added to cart" pages.
 - On Amazon pages, Browser Buddy removes docked-panel right padding and hides the cart arrow for a cleaner layout.
 
 - Finds duplicate, unpinned tabs by normalized URL.
@@ -78,11 +79,11 @@ npm test
 
 `npm test` runs `node --check` on the scripts, the Node unit tests in `tests/unit/`, and the Playwright end-to-end tests in `tests/e2e/`, which load the unpacked extension in Chromium. GitHub Actions runs the same command on every push and pull request.
 
-Duplicate-tab removal, bulk confirmation, and Undo are covered automatically. After reloading the unpacked extension, still check a YouTube video, the Subscriptions feed, and the Amazon cart sidebar toggle by hand.
+Duplicate-tab removal, bulk confirmation, Undo, the Amazon cart sidebar toggle, and Subscription Clean are covered automatically. Amazon and YouTube tests run against trimmed, anonymized pages captured from the live sites in `tests/fixtures/`. After reloading the unpacked extension, still check playback speed and Tutorial Mode on a YouTube video by hand, and glance at the live Subscriptions feed with Subscription Clean on.
 
 ## Known limitations
 
-- Subscription Clean uses YouTube page structure and visible English labels; YouTube UI changes or another language can affect which shelves it recognizes.
-- Amazon's page structure can change; Browser Buddy shows a popup warning when it cannot recognize a cart sidebar on the current Amazon page.
+- Subscription Clean finds Shorts shelves by page structure, which works in any UI language. The "Most relevant" shelf has no structural marker, so it is matched by its exact title and is only recognized in English (verified with en-GB); in other languages it stays visible. YouTube page changes can affect either check.
+- Amazon's page structure can change; Browser Buddy shows a popup warning when it cannot recognize a cart sidebar on the current Amazon page. Other supported storefronts use the same sidebar as the verified ones (amazon.com, .co.uk, .de, .in and .co.jp) but are not covered by captured test pages.
 - Undo recreates closed tabs by URL and approximate original index. It cannot restore a tab's back/forward history or unsaved form state.
 - Browser-internal pages that do not expose ordinary URLs cannot meaningfully be grouped as duplicates.

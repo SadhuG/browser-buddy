@@ -7,7 +7,7 @@ Manifest V3 extension for Chrome and Edge. Plain JavaScript, HTML and CSS with n
 - `content.js`: YouTube and Amazon page behavior
 - `background.js`: service worker
 - `lib/`: pure logic shared by extension scripts and Node tests. Plain scripts that end with a `module.exports` guard, loaded via `<script>` or the manifest.
-- Tests (dev-only, never loaded by the extension): `package.json`, `playwright.config.js`, `tests/unit/` (`node:test`), `tests/e2e/` (Playwright loads the unpacked extension; `tests/e2e/fixtures.js` provides `context`, `extensionId`, `popup`). Run `npm test`. CI: `.github/workflows/test.yml`.
+- Tests (dev-only, never loaded by the extension): `package.json`, `playwright.config.js`, `tests/unit/` (`node:test`), `tests/e2e/` (Playwright loads the unpacked extension; `tests/e2e/fixtures.js` provides `context`, `extensionId`, `popup`, plus `serveFixture` to serve captured pages from `tests/fixtures/` at real site URLs). Run `npm test`. CI: `.github/workflows/test.yml`.
 - `fonts/`: bundled Azeret Mono variable font (+ OFL license) used by the popup, bundled so it works offline without remote requests
 
 Popup design source: Figma file "Browser Buddy", frame "Browser Buddy · Complete UI (R1)" (node 11:3719). Tokens live as CSS variables at the top of `popup.css`.

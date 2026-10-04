@@ -2,13 +2,21 @@
 
 ## Unreleased
 
+### Added
+
+- End-to-end tests for Hide Amazon cart, using pages captured from amazon.com, .co.uk, .de, .in and .co.jp: hiding and restoring the sidebar, a sidebar that appears after load, and the popup's "no sidebar found" check.
+- End-to-end tests for Subscription Clean, using an anonymized capture of the Subscriptions feed.
+
 ### Changed
 
+- Subscription Clean recognizes Shorts shelves by page structure, not by their "Shorts" title, so it works in any YouTube UI language.
 - Closing a single duplicate no longer shows a floating message that covered the bottom of the list. The tab stays in place as a "Closed" row with its own Undo and an eight-second countdown line, then folds away. Bulk removal still uses a single message with Undo.
 
 ### Fixed
 
 - Tabs reopened by Undo are counted again immediately, before they finish loading.
+- Hide Amazon cart no longer hides the Subtotal and Proceed to checkout box on the cart page, and the popup no longer counts that box as a cart sidebar.
+- Subscription Clean only hides a shelf titled exactly "Most relevant"; shelves whose titles merely contain those words stay visible.
 
 ## v1.1.0
 

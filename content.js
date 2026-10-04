@@ -50,10 +50,17 @@ function resumeVideo() { if (!isTutorialMode() || !wasAutoPaused) return; const 
 function applySettings() { const video = videoElement(); if (video && Math.abs(video.playbackRate - playbackSpeed) > .01) video.playbackRate = playbackSpeed; }
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }
+// Shorts shelves are recognized by structure, so any UI language works. Seen on
+// the Subscriptions feed (tests/fixtures/youtube, 2026-10): ytd-rich-shelf-renderer[is-shorts]
+// holding ytm-shorts-lockup-view-model items with /shorts/ links.
+const shortsShelfSelector = '[is-shorts], ytd-reel-shelf-renderer, ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2, a[href^="/shorts/"], a[href*="youtube.com/shorts/"]';
+// "Most relevant" is an ordinary ytd-rich-shelf-renderer with no structural
+// marker, so it is matched by its exact title. Only add captured labels.
+const mostRelevantLabels = ['most relevant'];
+function normalizeLabel(text) { return (text || '').normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase(); }
 function shouldHide(section) {
-  if (section.querySelector('a[href^="/shorts/"], a[href*="youtube.com/shorts/"]')) return true;
-  const title = (section.querySelector('#title, h2, yt-formatted-string')?.textContent || '').trim().toLowerCase();
-  return title === 'shorts' || title.includes('most relevant');
+  if (section.matches('[is-shorts]') || section.querySelector(shortsShelfSelector)) return true;
+  return mostRelevantLabels.includes(normalizeLabel(section.querySelector('#title')?.textContent));
 }
 let scheduled = false;
 function scheduleSubscriptionClean() { if (scheduled) return; scheduled = true; requestAnimationFrame(applySubscriptionClean); }
@@ -70,10 +77,15 @@ function applySubscriptionClean() {
 new MutationObserver(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); wasAutoPaused = false; } applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); }).observe(document.documentElement, { childList:true, subtree:true });
 setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; currentVideoId = getVideoId(lastUrl); } applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); }, 1000);
 
+// Cart sidebar roots only. Never list the cart page's own checkout box
+// (#sc-buy-box): hiding it removes "Proceed to checkout".
 const amazonCartSelectors = [
-  '#nav-flyout-ewc', '#ewc-smart-wagon-desktop-sideSheet',
-  '#nav-flyout-cart', '#attach-sidesheet', '#attach-sidesheet-container',
-  '#sc-subtotal-right', '#sc-buy-box', '[data-feature-name="cart-sidebar"]', '[data-testid="cart-sidebar"]'
+  // Docked cart sidebar on product, search and "Added to cart" pages. Seen on
+  // .com, .co.uk, .de, .in and .co.jp (tests/fixtures/amazon, 2026-10).
+  '#nav-flyout-ewc',
+  // Older or regional sidebar variants, not seen in the 2026-10 captures.
+  '#ewc-smart-wagon-desktop-sideSheet', '#nav-flyout-cart', '#attach-sidesheet', '#attach-sidesheet-container',
+  '[data-feature-name="cart-sidebar"]', '[data-testid="cart-sidebar"]'
 ];
 const amazonCartHiddenAttribute = 'data-browser-buddy-amazon-cart-hidden';
 let amazonCartScheduled = false;
