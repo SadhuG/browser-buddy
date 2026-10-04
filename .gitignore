@@ -9,3 +9,7 @@ node_modules/
 test-results/
 playwright-report/
 .playwright-mcp/
+
+# Manual test notes
+manual-test-results.md
+manual-test-evidence/
