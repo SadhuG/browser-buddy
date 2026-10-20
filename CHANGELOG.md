@@ -4,6 +4,7 @@
 
 ### Added
 
+- Light theme, with a sun and moon switch in the popup header. The choice is remembered; until one is picked, the popup follows the system light or dark setting.
 - End-to-end tests for Hide Amazon cart, using pages captured from amazon.com, .co.uk, .de, .in and .co.jp: hiding and restoring the sidebar, a sidebar that appears after load, and the popup's "no sidebar found" check.
 - End-to-end tests for Subscription Clean, using an anonymized capture of the Subscriptions feed.
 

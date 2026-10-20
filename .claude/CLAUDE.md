@@ -4,13 +4,14 @@ Manifest V3 extension for Chrome and Edge. Plain JavaScript, HTML and CSS with n
 
 - `manifest.json`: permissions, host matches, content script registration
 - `popup.html` / `popup.css` / `popup.js`: toolbar popup UI
+- `theme.js`: loaded in the popup `<head>`; sets `data-theme` on `<html>` from `localStorage` (or the system setting) before first paint. Light colors override the dark tokens under `:root[data-theme="light"]` in `popup.css`; any new color token needs a value in both blocks.
 - `content.js`: YouTube and Amazon page behavior
 - `background.js`: service worker
 - `lib/`: pure logic shared by extension scripts and Node tests. Plain scripts that end with a `module.exports` guard, loaded via `<script>` or the manifest.
 - Tests (dev-only, never loaded by the extension): `package.json`, `playwright.config.js`, `tests/unit/` (`node:test`), `tests/e2e/` (Playwright loads the unpacked extension; `tests/e2e/fixtures.js` provides `context`, `extensionId`, `popup`, plus `serveFixture` to serve captured pages from `tests/fixtures/` at real site URLs). Run `npm test`. CI: `.github/workflows/test.yml`.
 - `fonts/`: bundled Azeret Mono variable font (+ OFL license) used by the popup, bundled so it works offline without remote requests
 
-Popup design source: Figma file "Browser Buddy", frame "Browser Buddy · Complete UI (R1)" (node 11:3719). Tokens live as CSS variables at the top of `popup.css`.
+Popup design source: Figma file "Browser Buddy", page "Popup UI". Dark: frame "Browser Buddy · Complete UI (R1)" (node 11:3719). Light: frame "Browser Buddy · Complete UI (R1) · Light" (node 14:6). The file allows only one variable mode, so the light frames use hard-coded colors, not variables. Tokens live as CSS variables at the top of `popup.css`.
 
 Keep `README.md` and `CHANGELOG.md` in sync with user-facing changes, and bump `version` in `manifest.json` on release.
 

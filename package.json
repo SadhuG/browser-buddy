@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "check": "node --check popup.js && node --check background.js && node --check content.js && node --check lib/duplicate-tabs.js",
+    "check": "node --check popup.js && node --check theme.js && node --check background.js && node --check content.js && node --check lib/duplicate-tabs.js",
     "test:unit": "node --test \"tests/unit/**/*.test.js\"",
     "test:e2e": "playwright test",
     "test": "npm run check && npm run test:unit && npm run test:e2e"
