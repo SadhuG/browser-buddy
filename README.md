@@ -2,9 +2,13 @@
 
 Browser Buddy is a compact Manifest V3 extension for Chromium browsers. It brings together a few focused utilities for everyday browsing: YouTube playback controls and a safe duplicate-tab cleanup workflow.
 
-It is designed as a toolbar popup for Chrome and Microsoft Edge, with a dark, monospaced interface set in Azeret Mono.
+It is designed as a toolbar popup for Chrome and Microsoft Edge, with a monospaced interface set in Azeret Mono, in light and dark themes.
 
 ## Features
+
+### Appearance
+
+- Light and dark themes. The sun and moon switch in the popup header picks one and remembers it; until you pick, the popup follows the system setting.
 
 ### YouTube
 
@@ -49,7 +53,8 @@ Reload the extension on that page after changing source files. Refresh any alrea
 | --- | --- |
 | `manifest.json` | Extension metadata, permissions, popup, service worker, and YouTube/Amazon content-script registration. |
 | `popup.html` | Toolbar popup structure and both feature views. |
-| `popup.css` | Dark popup interface and UI states. |
+| `popup.css` | Popup interface, light and dark theme colors, and UI states. |
+| `theme.js` | Applies the saved or system theme before the popup paints, and handles the theme switch. |
 | `fonts/` | Bundled Azeret Mono variable font used by the popup, with its OFL license. |
 | `popup.js` | Popup controls, tab discovery, confirmation, and Undo. |
 | `lib/duplicate-tabs.js` | Duplicate-tab URL normalization and grouping, shared by the popup and the unit tests. |
@@ -62,7 +67,7 @@ Reload the extension on that page after changing source files. Refresh any alrea
 Browser Buddy uses:
 
 - `tabs` to list, focus, create, and close tabs for the duplicate-tab tool.
-- `storage` to save playback speed and global preferences locally in the browser.
+- `storage` to save playback speed and global preferences locally in the browser. The theme choice is kept in the popup's own local storage.
 - YouTube and Amazon storefront host access only to run the helper on those pages. YouTube Music is excluded from the helper.
 
 The extension does not send browsing data or settings to a remote service. Tab URLs and titles are read only while the popup is open and are used locally to render duplicate groups.

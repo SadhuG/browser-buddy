@@ -5,15 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Browser Buddy</title>
     <link rel="stylesheet" href="popup.css">
+    <script src="theme.js"></script>
   </head>
   <body>
     <main class="app">
       <header class="topbar">
         <div class="brand"><span class="brand-mark" aria-hidden="true">B</span><span>browser buddy</span></div>
-        <nav class="seg" aria-label="Browser Buddy features">
-          <button class="app-tab is-active" data-panel="youtube" type="button" aria-pressed="true">YouTube</button>
-          <button class="app-tab" data-panel="tabs" type="button" aria-pressed="false">Tabs</button>
-        </nav>
+        <div class="topbar-controls">
+          <nav class="seg" aria-label="Browser Buddy features">
+            <button class="app-tab is-active" data-panel="youtube" type="button" aria-pressed="true">YouTube</button>
+            <button class="app-tab" data-panel="tabs" type="button" aria-pressed="false">Tabs</button>
+          </nav>
+          <div class="seg theme-toggle" role="group" aria-label="Color theme">
+            <button data-theme-choice="light" type="button" aria-pressed="false" aria-label="Light theme" title="Light theme"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><rect x="4" y="4" width="5" height="5" stroke="currentColor" stroke-width="1.2"/><path d="M6.5.5v1.7m0 8.6v1.7M.5 6.5h1.7m8.6 0h1.7M2.3 2.3l1.2 1.2m6 6 1.2 1.2m-8.4 0 1.2-1.2m6-6 1.2-1.2" stroke="currentColor" stroke-width="1.2"/></svg></button>
+            <button data-theme-choice="dark" type="button" aria-pressed="false" aria-label="Dark theme" title="Dark theme"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M11.4 8.3A5 5 0 0 1 4.7 1.6a5 5 0 1 0 6.7 6.7Z" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          </div>
+        </div>
       </header>
 
       <section id="youtube" class="view is-active" aria-label="YouTube controls">
