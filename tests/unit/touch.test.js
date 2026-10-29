@@ -9,10 +9,16 @@ test('nothing applied yet is ignored', () => {
   assert.equal(t.observe('quality', 'hd720', 0), 'ignored');
 });
 
-test('mismatch inside the grace window is ignored', () => {
+test('non-user mismatch inside the grace window is ignored', () => {
   const t = createTouchTracker();
   t.applied('quality', 'hd1080', 0);
-  assert.equal(t.observe('quality', 'hd720', 1000, user), 'ignored');
+  assert.equal(t.observe('quality', 'hd720', 1000), 'ignored');
+});
+
+test('user mismatch inside the grace window is still a touch', () => {
+  const t = createTouchTracker();
+  t.applied('quality', 'hd1080', 0);
+  assert.equal(t.observe('quality', 'hd720', 1000, user), 'touched');
 });
 
 test('same value after grace is same', () => {
