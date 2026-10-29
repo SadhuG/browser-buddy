@@ -33,6 +33,20 @@ test('quality accepts the listed choices and falls back to auto', () => {
   assert.equal(normalizeSettings({ quality: 1080 }).quality, 'auto');
 });
 
+test('custom presets keep only valid entries with normalized styles', () => {
+  const settings = normalizeSettings({ customPresets: [{ id: 'x' }, { id: 'c1', name: 'N', style: { color: '#123' } }, 'junk'] });
+  assert.equal(settings.customPresets.length, 1);
+  assert.deepEqual([settings.customPresets[0].id, settings.customPresets[0].name, settings.customPresets[0].style.color], ['c1', 'N', '#fff']);
+  assert.deepEqual(normalizeSettings({}).customPresets, []);
+});
+
+test('built-in preset edits keep only known built-in ids', () => {
+  const settings = normalizeSettings({ builtInPresetEdits: { nope: {}, minimal: { color: '#ff0' } } });
+  assert.deepEqual(Object.keys(settings.builtInPresetEdits), ['minimal']);
+  assert.equal(settings.builtInPresetEdits.minimal.color, '#ff0');
+  assert.deepEqual(normalizeSettings({}).builtInPresetEdits, {});
+});
+
 test('audio track choice is off by default', () => {
   assert.equal(normalizeSettings({}).audioTrackEnabled, false);
   assert.equal(normalizeSettings({ audioTrackEnabled: 1 }).audioTrackEnabled, true);
