@@ -16,7 +16,13 @@
       "*://*.amazon.com/*", "*://*.amazon.ca/*", "*://*.amazon.com.mx/*", "*://*.amazon.com.br/*", "*://*.amazon.co.uk/*", "*://*.amazon.de/*", "*://*.amazon.fr/*", "*://*.amazon.es/*", "*://*.amazon.it/*", "*://*.amazon.nl/*", "*://*.amazon.se/*", "*://*.amazon.pl/*", "*://*.amazon.com.tr/*", "*://*.amazon.ae/*", "*://*.amazon.sa/*", "*://*.amazon.eg/*", "*://*.amazon.in/*", "*://*.amazon.sg/*", "*://*.amazon.com.au/*", "*://*.amazon.co.jp/*", "*://*.amazon.com.be/*", "*://*.amazon.ie/*", "*://*.amazon.co.za/*"
     ],
     "exclude_matches": ["*://music.youtube.com/*"],
-    "js": ["content.js"],
+    "js": ["lib/settings.js", "lib/touch.js", "content.js"],
     "run_at": "document_end"
+  }, {
+    "matches": ["*://*.youtube.com/*"],
+    "exclude_matches": ["*://music.youtube.com/*"],
+    "js": ["lib/touch.js", "page-bridge.js"],
+    "world": "MAIN",
+    "run_at": "document_start"
   }]
 }

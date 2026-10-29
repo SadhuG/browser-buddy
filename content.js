@@ -17,28 +17,46 @@ if (/(^|\.)amazon\./.test(location.hostname)) {
   document.documentElement.appendChild(amazonBodyPaddingStyle);
 }
 
-chrome.storage.local.get(['playbackSpeed', 'tutorialMode', 'subscriptionCleanMode', 'hideAmazonCart'], (values) => {
-  playbackSpeed = values.playbackSpeed || 1;
-  tutorialMode = !!values.tutorialMode;
-  subscriptionCleanMode = !!values.subscriptionCleanMode;
-  hideAmazonCart = !!values.hideAmazonCart;
-  applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
-});
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return;
-  if (changes.playbackSpeed) playbackSpeed = changes.playbackSpeed.newValue || 1;
-  if (changes.tutorialMode) tutorialMode = !!changes.tutorialMode.newValue;
-  if (changes.subscriptionCleanMode) subscriptionCleanMode = !!changes.subscriptionCleanMode.newValue;
-  if (changes.hideAmazonCart) hideAmazonCart = !!changes.hideAmazonCart.newValue;
-  applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
-});
+let settings = BrowserBuddy.settings.normalizeSettings({});
+function loadSettings() {
+  chrome.storage.local.get(null, (values) => {
+    settings = BrowserBuddy.settings.normalizeSettings(values);
+    ({ playbackSpeed, tutorialMode, subscriptionCleanMode, hideAmazonCart } = settings);
+    sendSettingsToPage();
+    applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
+  });
+}
+loadSettings();
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local') loadSettings(); });
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'FOCUS_LOST') pauseVideo();
   if (message.type === 'FOCUS_GAINED') resumeVideo();
   if (message.type === 'TUTORIAL_MODE_UPDATED') tutorialMode = !!message.enabled;
   if (message.type === 'SUBSCRIPTION_CLEAN_UPDATED') { subscriptionCleanMode = !!message.enabled; scheduleSubscriptionClean(); }
   if (message.type === 'AMAZON_CART_STATUS') return Promise.resolve({ found: amazonCartSidebarFound() });
+  if (message.type === 'GET_TAB_STATUS') return Promise.resolve(tabStatus());
+  if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); return Promise.resolve(true); }
 });
+
+// Relay to page-bridge.js, which runs in the page's world and calls YouTube's player.
+const isYoutubePage = /(^|\.)youtube\.com$/.test(location.hostname);
+const bridgeMessage = (type, extra = {}) => window.postMessage({ source: 'browser-buddy', to: 'page', type, ...extra }, location.origin);
+let bridgeStatus = null;
+function sendSettingsToPage() { if (isYoutubePage) bridgeMessage('settings', { settings }); }
+if (isYoutubePage) {
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (event.source !== window || !data || data.source !== 'browser-buddy' || data.to !== 'extension') return;
+    if (data.type === 'hello') sendSettingsToPage();
+    if (data.type === 'status') bridgeStatus = data.status;
+  });
+}
+function tabStatus() {
+  if (!isYoutubePage) return null;
+  const status = bridgeStatus || { videoId: null, surface: null, touched: {}, auto: {}, unavailable: {} };
+  return { ...status, touched: { ...status.touched } };
+}
+function clearTouch(setting) { if (isYoutubePage) bridgeMessage('clear-touch', { setting }); }
 document.addEventListener('visibilitychange', () => document.hidden ? pauseVideo() : resumeVideo());
 window.addEventListener('blur', pauseVideo); window.addEventListener('focus', resumeVideo);
 

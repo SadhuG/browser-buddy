@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Stub video - YouTube</title></head>
+<body>
+<!-- Stand-in for YouTube's watch page: a fake #movie_player exposing the player API
+     methods Browser Buddy calls. Configure with window.__bbStubConfig (page.addInitScript);
+     drive and inspect it through window.__bbStub. Each phase adds the methods it needs. -->
+<ytd-app>
+  <div id="movie_player" class="html5-video-player"><video></video></div>
+</ytd-app>
+<script>
+(() => {
+  const config = window.__bbStubConfig || {};
+  const player = document.getElementById('movie_player');
+  const stub = window.__bbStub = {
+    calls: [],
+    state: { videoId: new URLSearchParams(location.search).get('v') || 'stub1' },
+    config,
+  };
+  const define = (name, fn) => { player[name] = (...args) => { stub.calls.push([name, ...args]); return fn(...args); }; };
+  stub.callsTo = (name) => stub.calls.filter((call) => call[0] === name);
+
+  define('getVideoData', () => ({ video_id: stub.state.videoId }));
+  define('getPlayerState', () => 1);
+
+  stub.loadVideo = (id) => { stub.state.videoId = id; history.pushState({}, '', '/watch?v=' + id); };
+  stub.setMiniplayer = (on) => document.querySelector('ytd-app').toggleAttribute('miniplayer-is-active', on);
+  stub.startAd = () => player.classList.add('ad-showing');
+  stub.endAd = () => player.classList.remove('ad-showing');
+})();
+</script>
+</body>
+</html>
