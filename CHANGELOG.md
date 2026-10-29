@@ -5,6 +5,7 @@
 ### Added
 
 - Preferred resolution for every YouTube video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer and on low battery, Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video. (Engine only; the popup control arrives with the redesigned YouTube tab.)
+- Captions always on, always off, or YouTube's choice, in your languages, auto-translated when needed. A caption style built from YouTube's own options is applied on every video and restored if YouTube resets it, with four built-in looks: Classic, High contrast, Minimal and Large print. (Engine only, as above.)
 
 ### Changed
 
