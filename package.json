@@ -4,7 +4,8 @@
     "check": "node --check popup.js && node --check theme.js && node --check background.js && node --check content.js && node --check lib/duplicate-tabs.js && node --check lib/settings.js && node --check lib/touch.js && node --check page-bridge.js",
     "test:unit": "node --test \"tests/unit/**/*.test.js\"",
     "test:e2e": "playwright test",
-    "test": "npm run check && npm run test:unit && npm run test:e2e"
+    "test": "npm run check && npm run test:unit && npm run test:e2e",
+    "test:live": "playwright test -c playwright.live.config.js"
   },
   "devDependencies": { "@playwright/test": "^1" }
 }
