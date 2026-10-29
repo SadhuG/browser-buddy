@@ -33,6 +33,11 @@ test('quality accepts the listed choices and falls back to auto', () => {
   assert.equal(normalizeSettings({ quality: 1080 }).quality, 'auto');
 });
 
+test('audio track choice is off by default', () => {
+  assert.equal(normalizeSettings({}).audioTrackEnabled, false);
+  assert.equal(normalizeSettings({ audioTrackEnabled: 1 }).audioTrackEnabled, true);
+});
+
 test('caption settings default to changing nothing', () => {
   const { DEFAULT_STYLE } = require('../../lib/caption-style.js');
   const settings = normalizeSettings({});
