@@ -23,6 +23,25 @@
   define('getVideoData', () => ({ video_id: stub.state.videoId }));
   define('getPlayerState', () => 1);
 
+  // Quality. A pick in YouTube's own menu also moves the user preference; Browser Buddy's
+  // setPlaybackQualityRange does not (findings Q3).
+  const quality = { available: [], current: 'hd720', preference: 'auto', ...(config.quality || {}) };
+  define('getAvailableQualityData', () => quality.available);
+  define('getPlaybackQuality', () => quality.current);
+  define('getUserPlaybackQualityPreference', () => quality.preference);
+  define('setPlaybackQualityRange', (min) => { if (min === 'auto') quality.preference = 'auto'; else quality.current = min; });
+  stub.userSetQuality = (q) => { quality.current = q; quality.preference = q; };
+  stub.driftQuality = (q) => { quality.current = q; };
+
+  // Battery (navigator.getBattery), controllable from tests.
+  const battery = Object.assign(new EventTarget(), { charging: true, level: 1 }, config.battery || {});
+  Object.defineProperty(navigator, 'getBattery', { configurable: true, value: () => Promise.resolve(battery) });
+  stub.setBattery = ({ charging, level }) => {
+    Object.assign(battery, { charging, level });
+    battery.dispatchEvent(new Event('chargingchange'));
+    battery.dispatchEvent(new Event('levelchange'));
+  };
+
   stub.loadVideo = (id) => { stub.state.videoId = id; history.pushState({}, '', '/watch?v=' + id); };
   stub.setMiniplayer = (on) => document.querySelector('ytd-app').toggleAttribute('miniplayer-is-active', on);
   stub.startAd = () => player.classList.add('ad-showing');

@@ -49,7 +49,7 @@
   function stateFor(player) {
     if (!player) return null;
     let state = players.get(player);
-    if (!state) { state = { videoId: undefined, tracker: BB.touch.createTouchTracker() }; players.set(player, state); }
+    if (!state) { state = { videoId: undefined, video: {}, tracker: BB.touch.createTouchTracker() }; players.set(player, state); }
     return state;
   }
   function safe(fn) { try { return fn(); } catch (_) { return null; } }
@@ -60,7 +60,8 @@
     const state = stateFor(player);
     if (player) {
       const videoId = safe(() => player.getVideoData().video_id) || null;
-      if (state.videoId !== videoId) { state.videoId = videoId; state.tracker.reset(); }
+      // A new video ends every touch and forgets what was applied to the last one.
+      if (state.videoId !== videoId) { state.videoId = videoId; state.video = {}; state.tracker.reset(); }
       status.videoId = videoId;
       status.surface = surface();
       const ad = player.classList.contains('ad-showing');
@@ -75,6 +76,44 @@
     const json = JSON.stringify(status);
     if (json !== lastStatusJson) { lastStatusJson = json; post('status', { status }); }
   }
+
+  // Resolution. Battery is read lazily so a page can provide navigator.getBattery late.
+  let battery = null;
+  let batteryRequested = false;
+  function lowBattery() {
+    if (!batteryRequested && typeof navigator.getBattery === 'function') {
+      batteryRequested = true;
+      navigator.getBattery().then((value) => { battery = value; }).catch(() => {});
+    }
+    return !!battery && !battery.charging && battery.level < 0.2;
+  }
+  appliers.push({
+    name: 'quality',
+    apply(player, { settings, tracker, now, status, state }) {
+      const preference = settings.quality;
+      if (preference === 'auto') {
+        if (state.qualityManaged) { state.qualityManaged = false; player.setPlaybackQualityRange('auto', 'auto'); }
+        return;
+      }
+      const available = BB.quality.normalizeQualityData(player.getAvailableQualityData());
+      const pick = BB.quality.pickQuality({ available, preference, miniplayer: status.surface === 'miniplayer', lowBattery: lowBattery() });
+      if (pick.reason === 'miniplayer' || pick.reason === 'battery') status.auto.quality = { height: pick.height, reason: pick.reason };
+      if (pick.maxHeight && /^\d+$/.test(preference) && Number(preference) > pick.maxHeight) status.unavailable.quality = { maxHeight: pick.maxHeight };
+      if (!pick.quality) return;
+      // A pick in YouTube's quality menu moves the user preference; Browser Buddy's range does not.
+      const userPreference = typeof player.getUserPlaybackQualityPreference === 'function' ? player.getUserPlaybackQualityPreference() : 'auto';
+      const userPicked = state.lastQualityPreference !== undefined && userPreference !== state.lastQualityPreference;
+      state.lastQualityPreference = userPreference;
+      const result = tracker.observe('quality', player.getPlaybackQuality(), now, { userInitiated: userPicked });
+      if (tracker.isTouched('quality')) return;
+      if (pick.quality !== state.video.quality || result === 'drift') {
+        player.setPlaybackQualityRange(pick.quality, pick.quality);
+        tracker.applied('quality', pick.quality, now);
+        state.video.quality = pick.quality;
+        state.qualityManaged = true;
+      }
+    },
+  });
 
   window.BrowserBuddy.bridge = { appliers, tick };
   post('hello');
