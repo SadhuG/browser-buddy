@@ -25,6 +25,14 @@ test('booleans are coerced', () => assert.equal(normalizeSettings({ tutorialMode
 
 test('unknown keys are dropped', () => assert.equal('foo' in normalizeSettings({ foo: 1 }), false));
 
+test('quality accepts the listed choices and falls back to auto', () => {
+  assert.equal(normalizeSettings({}).quality, 'auto');
+  assert.equal(normalizeSettings({ quality: '1080' }).quality, '1080');
+  assert.equal(normalizeSettings({ quality: 'highest' }).quality, 'highest');
+  assert.equal(normalizeSettings({ quality: '999' }).quality, 'auto');
+  assert.equal(normalizeSettings({ quality: 1080 }).quality, 'auto');
+});
+
 test('the result is a fresh copy', () => {
   const settings = normalizeSettings({});
   settings.playbackSpeed = 2;
