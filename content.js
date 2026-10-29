@@ -54,18 +54,45 @@ if (isYoutubePage) {
 function tabStatus() {
   if (!isYoutubePage) return null;
   const status = bridgeStatus || { videoId: null, surface: null, touched: {}, auto: {}, unavailable: {} };
-  return { ...status, touched: { ...status.touched } };
+  return { ...status, touched: { ...status.touched, ...speedTracker.touches() } };
 }
-function clearTouch(setting) { if (isYoutubePage) bridgeMessage('clear-touch', { setting }); }
+function clearTouch(setting) {
+  if (setting === 'speed') { speedTracker.clear('speed'); applySettings(); return; }
+  if (isYoutubePage) bridgeMessage('clear-touch', { setting });
+}
 document.addEventListener('visibilitychange', () => document.hidden ? pauseVideo() : resumeVideo());
 window.addEventListener('blur', pauseVideo); window.addEventListener('focus', resumeVideo);
 
 function getVideoId(value) { try { const url = new URL(value); return url.hostname.includes('youtube.com') && url.pathname === '/watch' ? url.searchParams.get('v') : null; } catch (_) { return null; } }
 function isTutorialMode() { return !!currentVideoId && tutorialMode; }
-function videoElement() { const video = document.querySelector('video'); if (video !== lastVideo) { lastVideo = video; wasAutoPaused = false; } return video; }
+function videoElement() { const video = document.querySelector('video'); if (video !== lastVideo) { lastVideo = video; wasAutoPaused = false; speedTracker.reset(); } return video; }
 function pauseVideo() { if (!isTutorialMode()) return; const video = videoElement(); if (video && !video.paused) { video.pause(); wasAutoPaused = true; } }
 function resumeVideo() { if (!isTutorialMode() || !wasAutoPaused) return; const video = videoElement(); if (video?.paused) video.play().catch(() => {}); wasAutoPaused = false; }
-function applySettings() { const video = videoElement(); if (video && Math.abs(video.playbackRate - playbackSpeed) > .01) video.playbackRate = playbackSpeed; }
+
+// "Your touch wins" for speed: a rate the user picks in YouTube's player holds for that
+// video; a rate change without user input (e.g. YouTube's own) is reverted.
+const speedTracker = BrowserBuddy.touch.createTouchTracker({ graceMs: 0, comparators: { speed: (a, b) => Math.abs(a - b) < .01 } });
+let lastUserInput = -Infinity;
+const markUserInput = (event) => { if (event.isTrusted) lastUserInput = performance.now(); };
+window.addEventListener('pointerdown', markUserInput, true);
+window.addEventListener('keydown', markUserInput, true);
+document.addEventListener('ratechange', (event) => {
+  if (event.target !== videoElement()) return;
+  const result = speedTracker.observe('speed', event.target.playbackRate, Date.now(), { userInitiated: performance.now() - lastUserInput < 2000 });
+  if (result === 'drift') applySettings();
+}, true);
+// Watch pages and Shorts both count as "a video" for ending a touch.
+function videoKey(value) { try { const url = new URL(value); return url.searchParams.get('v') || (url.pathname.match(/^\/shorts\/([^/]+)/) || [])[1] || null; } catch (_) { return null; } }
+let lastVideoKey = videoKey(location.href);
+function noteNavigation() { const key = videoKey(location.href); if (key !== lastVideoKey) { lastVideoKey = key; speedTracker.reset(); } }
+
+function applySettings() {
+  noteNavigation();
+  const video = videoElement();
+  if (!video || speedTracker.isTouched('speed')) return;
+  if (Math.abs(video.playbackRate - playbackSpeed) > .01) video.playbackRate = playbackSpeed;
+  speedTracker.applied('speed', playbackSpeed, Date.now());
+}
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }
 // Shorts shelves are recognized by structure, so any UI language works. Seen on
