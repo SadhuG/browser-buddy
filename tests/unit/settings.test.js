@@ -33,6 +33,35 @@ test('quality accepts the listed choices and falls back to auto', () => {
   assert.equal(normalizeSettings({ quality: 1080 }).quality, 'auto');
 });
 
+test('caption settings default to changing nothing', () => {
+  const { DEFAULT_STYLE } = require('../../lib/caption-style.js');
+  const settings = normalizeSettings({});
+  assert.equal(settings.captionsMode, 'youtube');
+  assert.equal(settings.captionStyleEnabled, false);
+  assert.deepEqual(settings.captionStyle, DEFAULT_STYLE);
+  assert.equal(settings.captionPresetId, 'classic');
+  assert.deepEqual(settings.myLanguages, ['en', 'hi']);
+});
+
+test('captionsMode accepts youtube, on and off only', () => {
+  assert.equal(normalizeSettings({ captionsMode: 'on' }).captionsMode, 'on');
+  assert.equal(normalizeSettings({ captionsMode: 'sometimes' }).captionsMode, 'youtube');
+});
+
+test('myLanguages keeps base codes in order without duplicates', () => {
+  assert.deepEqual(normalizeSettings({ myLanguages: ['en-US', 'EN', 'hi'] }).myLanguages, ['en', 'hi']);
+  assert.deepEqual(normalizeSettings({ myLanguages: [] }).myLanguages, ['en', 'hi']);
+  assert.deepEqual(normalizeSettings({ myLanguages: 'en' }).myLanguages, ['en', 'hi']);
+  assert.equal(normalizeSettings({ myLanguages: 'abcdefghijkl'.split('') }).myLanguages.length, 10);
+});
+
+test('captionStyle is normalized and captionPresetId may be null', () => {
+  assert.equal(normalizeSettings({ captionStyle: { color: '#123' } }).captionStyle.color, '#fff');
+  assert.equal(normalizeSettings({ captionPresetId: null }).captionPresetId, null);
+  assert.equal(normalizeSettings({ captionPresetId: 'custom-1' }).captionPresetId, 'custom-1');
+  assert.equal(normalizeSettings({ captionPresetId: 5 }).captionPresetId, 'classic');
+});
+
 test('the result is a fresh copy', () => {
   const settings = normalizeSettings({});
   settings.playbackSpeed = 2;
