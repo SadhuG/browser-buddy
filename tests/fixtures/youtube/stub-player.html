@@ -64,6 +64,17 @@
     if (languageCode) caps.track = caps.tracks.find((t) => t.languageCode === languageCode) || caps.track;
   };
 
+  // Caption style (findings Q6). Like the real player, it reads null and refuses updates during an ad.
+  let captionStyle = { background: '#080808', backgroundOpacity: 0.75, charEdgeStyle: 0, color: '#fff', fontFamily: 4, fontSizeIncrement: 0, fontStyle: 0, textOpacity: 1, windowColor: '#080808', windowOpacity: 0, ...(config.style || {}) };
+  const inAd = () => player.classList.contains('ad-showing');
+  define('getSubtitlesUserSettings', () => (inAd() ? null : { ...captionStyle }));
+  define('updateSubtitlesUserSettings', (partial) => {
+    if (inAd()) throw new TypeError("Cannot read properties of undefined (reading 'daa')");
+    captionStyle = { ...captionStyle, ...partial };
+  });
+  stub.userSetStyle = (partial) => { captionStyle = { ...captionStyle, ...partial }; };
+  stub.driftStyle = (full) => { captionStyle = { ...full }; };
+
   stub.loadVideo = (id) => { stub.state.videoId = id; history.pushState({}, '', '/watch?v=' + id); };
   stub.setMiniplayer = (on) => document.querySelector('ytd-app').toggleAttribute('miniplayer-is-active', on);
   stub.startAd = () => player.classList.add('ad-showing');

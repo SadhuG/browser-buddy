@@ -49,7 +49,11 @@
   function stateFor(player) {
     if (!player) return null;
     let state = players.get(player);
-    if (!state) { state = { videoId: undefined, video: {}, tracker: BB.touch.createTouchTracker() }; players.set(player, state); }
+    if (!state) {
+      const tracker = BB.touch.createTouchTracker({ comparators: { captionStyle: (a, b) => BB.captionStyle.stylesEqual(a, b) } });
+      state = { videoId: undefined, video: {}, tracker };
+      players.set(player, state);
+    }
     return state;
   }
   function safe(fn) { try { return fn(); } catch (_) { return null; } }
@@ -157,6 +161,27 @@
         show();
         tracker.applied('captions', wanted, now);
         state.video.captions = wanted;
+      }
+    },
+  });
+
+  // Caption style. Re-applied at the start of every video and whenever YouTube's stored style
+  // drifts (it expires after 30 days); a change made in YouTube's own menu is a touch.
+  appliers.push({
+    name: 'captionStyle',
+    apply(player, { settings, tracker, now, status, state, userInitiated }) {
+      if (status.surface === 'miniplayer' || !settings.captionStyleEnabled) return;
+      const raw = player.getSubtitlesUserSettings();
+      if (!raw) return;
+      const result = tracker.observe('captionStyle', BB.captionStyle.fromYoutubeSettings(raw), now, { userInitiated });
+      if (tracker.isTouched('captionStyle')) return;
+      const wanted = settings.captionStyle;
+      if (!state.video.style || result === 'drift' || !BB.captionStyle.stylesEqual(state.video.style, wanted)) {
+        player.updateSubtitlesUserSettings(BB.captionStyle.toYoutubeSettings(wanted));
+        // Captions already on screen only pick up the new style after an off/on (findings Q6).
+        if (player.isSubtitlesOn()) { player.toggleSubtitles(); player.toggleSubtitles(); }
+        tracker.applied('captionStyle', wanted, now);
+        state.video.style = wanted;
       }
     },
   });
