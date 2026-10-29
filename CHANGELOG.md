@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Preferred resolution for every YouTube video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer and on low battery, Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video. (Engine only; the popup control arrives with the redesigned YouTube tab.)
+
 ### Changed
 
 - Secondary and faint text has more contrast in both themes, so the search placeholder, closed-tab titles and unselected toggle labels meet WCAG AA (4.5:1). Secondary text is brighter in dark mode and darker in light mode, keeping a clear step between regular, secondary and faint text.

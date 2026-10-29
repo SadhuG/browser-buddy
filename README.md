@@ -13,6 +13,7 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a monospac
 ### YouTube
 
 - Playback speed from 0.25× to 4×, with quick presets. A speed you pick in YouTube's own player holds for that video; the next video uses Browser Buddy's speed again.
+- Preferred resolution for every video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer and on low battery, Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video.
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
 - Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf. Shorts shelves are recognized by page structure in any language; other shelves and videos are left alone.
 - Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
