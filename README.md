@@ -12,7 +12,7 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a monospac
 
 ### YouTube
 
-- Playback speed from 0.25× to 4×, with quick presets.
+- Playback speed from 0.25× to 4×, with quick presets. A speed you pick in YouTube's own player holds for that video; the next video uses Browser Buddy's speed again.
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
 - Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf. Shorts shelves are recognized by page structure in any language; other shelves and videos are left alone.
 - Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
@@ -58,9 +58,12 @@ Reload the extension on that page after changing source files. Refresh any alrea
 | `fonts/` | Bundled Azeret Mono variable font used by the popup, with its OFL license. |
 | `popup.js` | Popup controls, tab discovery, confirmation, and Undo. |
 | `lib/duplicate-tabs.js` | Duplicate-tab URL normalization and grouping, shared by the popup and the unit tests. |
+| `lib/settings.js` | Setting defaults and validation, shared by the content scripts, popup and unit tests. |
+| `lib/touch.js` | Tells Browser Buddy's own changes apart from changes you make in YouTube's player, so your change holds for that video. |
 | `background.js` | Detects tab/window focus changes and notifies YouTube pages. |
-| `content.js` | Applies YouTube controls and the Amazon cart-sidebar preference. |
-| `package.json`, `playwright.config.js`, `tests/` | Dev-only test tooling. The extension never loads these. |
+| `content.js` | Applies YouTube controls and the Amazon cart-sidebar preference, and relays settings to `page-bridge.js`. |
+| `page-bridge.js` | Runs inside YouTube pages to reach YouTube's own player controls; talks to `content.js` through window messages. |
+| `package.json`, `playwright.config.js`, `playwright.live.config.js`, `tests/` | Dev-only test tooling. The extension never loads these. |
 
 ## Permissions and privacy
 
@@ -83,6 +86,8 @@ npm test
 ```
 
 `npm test` runs `node --check` on the scripts, the Node unit tests in `tests/unit/`, and the Playwright end-to-end tests in `tests/e2e/`, which load the unpacked extension in Chromium. GitHub Actions runs the same command on every push and pull request.
+
+`npm run test:live` runs `tests/live/` against real youtube.com videos (listed in `tests/live/videos.js`). It needs the network and is slower and flakier because of ads, so it runs locally only, not in CI. YouTube behavior the e2e tests can't capture is tested against a stand-in player, `tests/fixtures/youtube/stub-player.html`.
 
 Duplicate-tab removal, bulk confirmation, Undo, the Amazon cart sidebar toggle, and Subscription Clean are covered automatically. Amazon and YouTube tests run against trimmed, anonymized pages captured from the live sites in `tests/fixtures/`. After reloading the unpacked extension, still check playback speed and Tutorial Mode on a YouTube video by hand, and glance at the live Subscriptions feed with Subscription Clean on.
 
