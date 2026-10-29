@@ -75,6 +75,18 @@
   stub.userSetStyle = (partial) => { captionStyle = { ...captionStyle, ...partial }; };
   stub.driftStyle = (full) => { captionStyle = { ...full }; };
 
+  // Audio tracks (findings Q4): a single-track video lists []; setAudioTrack takes the raw
+  // track object and rejects a plain id like the real player does.
+  const audio = { tracks: [], current: null, ...(config.audio || {}) };
+  define('getAvailableAudioTracks', () => audio.tracks);
+  define('getAudioTrack', () => audio.tracks.find((t) => t.id === audio.current) || { id: audio.current });
+  define('setAudioTrack', (track) => {
+    if (!track || typeof track !== 'object') throw new TypeError("Cannot read properties of null (reading 'reason')");
+    audio.current = track.id;
+    return true;
+  });
+  stub.userSetAudio = (id) => { audio.current = id; };
+
   stub.loadVideo = (id) => { stub.state.videoId = id; history.pushState({}, '', '/watch?v=' + id); };
   stub.setMiniplayer = (on) => document.querySelector('ytd-app').toggleAttribute('miniplayer-is-active', on);
   stub.startAd = () => player.classList.add('ad-showing');
