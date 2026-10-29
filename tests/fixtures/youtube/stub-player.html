@@ -42,6 +42,28 @@
     battery.dispatchEvent(new Event('levelchange'));
   };
 
+  // Captions (findings Q5): the tracklist is empty until the captions module loads;
+  // setOption('captions','track', entry) shows that track; unloadModule turns them off.
+  const caps = { tracks: [], translationLanguages: [], on: false, track: null, ...(config.captions || {}) };
+  caps.loaded = caps.on;
+  define('loadModule', (name) => { if (name === 'captions') { caps.loaded = true; } });
+  define('unloadModule', (name) => { if (name === 'captions') { caps.loaded = false; caps.on = false; } });
+  define('getOption', (module, key) => {
+    if (module !== 'captions') return undefined;
+    if (key === 'tracklist') return caps.loaded ? caps.tracks : [];
+    if (key === 'translationLanguages') return caps.translationLanguages;
+    if (key === 'track') return caps.on && caps.track ? caps.track : {};
+    return undefined;
+  });
+  define('setOption', (module, key, value) => { if (module === 'captions' && key === 'track') { caps.track = value; caps.on = true; caps.loaded = true; } });
+  define('isSubtitlesOn', () => caps.on);
+  define('toggleSubtitlesOn', () => { caps.on = true; caps.loaded = true; });
+  define('toggleSubtitles', () => { caps.on = !caps.on; });
+  stub.userSetCaptions = (on, languageCode) => {
+    caps.on = on;
+    if (languageCode) caps.track = caps.tracks.find((t) => t.languageCode === languageCode) || caps.track;
+  };
+
   stub.loadVideo = (id) => { stub.state.videoId = id; history.pushState({}, '', '/watch?v=' + id); };
   stub.setMiniplayer = (on) => document.querySelector('ytd-app').toggleAttribute('miniplayer-is-active', on);
   stub.startAd = () => player.classList.add('ad-showing');

@@ -115,6 +115,52 @@
     },
   });
 
+  // Captions on/off and language. ctx.forceCaptionsLanguage (set by the audio applier when a
+  // foreign video has no dub in My languages) turns captions on in that language whatever the mode.
+  const CAPTION_LOAD_TRIES = 5;
+  function captionKey(player) {
+    const on = player.isSubtitlesOn();
+    const track = on ? player.getOption('captions', 'track') : null;
+    return BB.captionTrack.captionStateKey({ on, track, translationLanguage: track && track.translationLanguage });
+  }
+  appliers.push({
+    name: 'captions',
+    apply(player, ctx) {
+      const { settings, tracker, now, status, state } = ctx;
+      if (status.surface === 'miniplayer') return;
+      const force = ctx.forceCaptionsLanguage;
+      const mode = force ? 'on' : settings.captionsMode;
+      if (mode === 'youtube') return;
+      const result = tracker.observe('captions', captionKey(player), now, { userInitiated: ctx.userInitiated });
+      if (tracker.isTouched('captions')) return;
+
+      let wanted;
+      let show;
+      if (mode === 'off') {
+        wanted = 'off';
+        show = () => player.unloadModule('captions');
+      } else {
+        const tracks = player.getOption('captions', 'tracklist', { includeAsr: true }) || [];
+        if (!tracks.length) {
+          state.video.captionTries = (state.video.captionTries || 0) + 1;
+          if (state.video.captionTries > CAPTION_LOAD_TRIES) status.unavailable.captions = true;
+          else player.loadModule('captions');
+          return;
+        }
+        const myLanguages = force ? [force, ...settings.myLanguages.filter((code) => code !== force)] : settings.myLanguages;
+        const pick = BB.captionTrack.pickCaptionTrack({ tracks, translationLanguages: player.getOption('captions', 'translationLanguages') || [], myLanguages });
+        if (!pick) { status.unavailable.captions = true; return; }
+        wanted = BB.captionTrack.captionStateKey({ on: true, track: pick.track, translationLanguage: pick.translationLanguage });
+        show = () => player.setOption('captions', 'track', pick.translationLanguage ? { ...pick.track, translationLanguage: pick.translationLanguage } : pick.track);
+      }
+      if (wanted !== state.video.captions || result === 'drift') {
+        show();
+        tracker.applied('captions', wanted, now);
+        state.video.captions = wanted;
+      }
+    },
+  });
+
   window.BrowserBuddy.bridge = { appliers, tick };
   post('hello');
   setInterval(tick, 1000);
