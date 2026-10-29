@@ -1,0 +1,60 @@
+{
+  "0e3GPea1Tyg": [
+    {
+      "id": "251;Cg8KBWFjb250EgZkdWJiZWQKCgoEbGFuZxICYXI",
+      "info": {
+        "name": "Arabic",
+        "id": "ar.3",
+        "isDefault": false,
+        "isAutoDubbed": false
+      }
+    },
+    {
+      "id": "251;ChEKBWFjb250EghvcmlnaW5hbAoICgNkcmMSATEKDQoEbGFuZxIFZW4tVVM",
+      "info": {
+        "name": "English (US) original",
+        "id": "en-US.4",
+        "isDefault": true,
+        "isAutoDubbed": false
+      }
+    },
+    {
+      "id": "251;Cg8KBWFjb250EgZkdWJiZWQKCgoEbGFuZxICaGk",
+      "info": {
+        "name": "Hindi",
+        "id": "hi.3",
+        "isDefault": false,
+        "isAutoDubbed": false
+      }
+    },
+    {
+      "id": "251;Cg8KBWFjb250EgZkdWJiZWQKCgoEbGFuZxICZXM",
+      "info": {
+        "name": "Spanish",
+        "id": "es.3",
+        "isDefault": false,
+        "isAutoDubbed": false
+      }
+    }
+  ],
+  "bRtSGQYY3m4": [
+    {
+      "id": "251;ChQKBWFjb250EgtkdWJiZWQtYXV0bwoNCgRsYW5nEgVlbi1VUw",
+      "info": {
+        "name": "English (US)",
+        "id": "en-US.10",
+        "isDefault": true,
+        "isAutoDubbed": true
+      }
+    },
+    {
+      "id": "251;ChEKBWFjb250EghvcmlnaW5hbAoICgNkcmMSATEKCgoEbGFuZxICaGk",
+      "info": {
+        "name": "Hindi original",
+        "id": "hi.4",
+        "isDefault": false,
+        "isAutoDubbed": false
+      }
+    }
+  ]
+}
