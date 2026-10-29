@@ -21,7 +21,7 @@
   }, {
     "matches": ["*://*.youtube.com/*"],
     "exclude_matches": ["*://music.youtube.com/*"],
-    "js": ["lib/touch.js", "lib/quality.js", "lib/languages.js", "lib/caption-track.js", "lib/caption-style.js", "page-bridge.js"],
+    "js": ["lib/touch.js", "lib/quality.js", "lib/languages.js", "lib/caption-track.js", "lib/caption-style.js", "lib/audio-track.js", "page-bridge.js"],
     "world": "MAIN",
     "run_at": "document_start"
   }]

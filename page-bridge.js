@@ -165,6 +165,31 @@
     },
   });
 
+  // Audio track, from My languages. Runs before the captions applier, which it asks to turn
+  // captions on (ctx.forceCaptionsLanguage) when a foreign original has no dub you speak.
+  appliers.splice(appliers.findIndex((applier) => applier.name === 'captions'), 0, {
+    name: 'audio',
+    apply(player, ctx) {
+      const { settings, tracker, now, status, state, userInitiated } = ctx;
+      if (!settings.audioTrackEnabled) return;
+      const raw = player.getAvailableAudioTracks() || [];
+      const tracks = raw.map(BB.audioTrack.parseAudioTrack);
+      const pick = BB.audioTrack.pickAudioTrack(tracks.filter(Boolean), settings.myLanguages);
+      status.audioChoice = { reason: pick.reason, language: pick.language };
+      if (pick.reason === 'single-track') { status.unavailable.audio = true; return; }
+      const current = player.getAudioTrack();
+      const result = tracker.observe('audio', current && current.id, now, { userInitiated });
+      if (tracker.isTouched('audio')) return;
+      if (pick.captionLanguage) ctx.forceCaptionsLanguage = pick.captionLanguage;
+      if (pick.trackId && (pick.trackId !== state.video.audio || result === 'drift')) {
+        // setAudioTrack needs the raw track object, not its id (findings Q4).
+        if (!current || current.id !== pick.trackId) player.setAudioTrack(raw[tracks.findIndex((track) => track && track.id === pick.trackId)]);
+        tracker.applied('audio', pick.trackId, now);
+        state.video.audio = pick.trackId;
+      }
+    },
+  });
+
   // Caption style. Re-applied at the start of every video and whenever YouTube's stored style
   // drifts (it expires after 30 days); a change made in YouTube's own menu is a touch.
   appliers.push({
