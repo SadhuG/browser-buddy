@@ -108,6 +108,14 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Captions</b></p>
               <span id="captionsChip" class="chip"></span>
             </div>
+            <div id="savePresetPrompt" class="screen-section" hidden>
+              <p class="prompt-title">Save the player’s look as a preset?</p>
+              <div class="video-swatch is-short" role="img" aria-label="Caption look set in the player"><span id="touchedWindow" class="caption-window"><span id="touchedPreview" class="caption-cue">Captions set in the player</span></span><span class="video-progress" aria-hidden="true"></span></div>
+              <label for="touchedPresetName" class="label">Name</label>
+              <input id="touchedPresetName" class="text-field" type="text" maxlength="24" autocomplete="off">
+              <p id="touchedPresetError" class="field-error" role="alert" hidden></p>
+              <div class="button-row"><button id="saveTouchedPreset" class="primary-button compact" type="button">Save preset</button><button id="dismissSavePrompt" class="button" type="button">Not now</button></div>
+            </div>
             <div class="screen-section">
               <p id="captionsModeLabel" class="label">Show captions</p>
               <div id="captionsMode" class="seg-control" role="group" aria-labelledby="captionsModeLabel">
@@ -119,6 +127,7 @@
               <label class="toggle"><input id="captionStyleEnabled" type="checkbox" aria-labelledby="captionStyleTitle" aria-describedby="captionStyleDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
             </div>
             <div id="captionStyleControls">
+              <div id="editingPreset" class="editing-note" role="status" hidden><p>Editing <b id="editingPresetName"></b>. Changes save to the preset.</p><button id="doneEditing" class="text-link" type="button">Done</button></div>
               <div class="screen-section no-rule">
                 <div class="video-swatch" role="img" aria-label="Caption preview"><span id="captionWindow" class="caption-window"><span id="captionPreview" class="caption-cue">Captions look like this on every video.</span></span><span class="video-progress" aria-hidden="true"></span></div>
               </div>
@@ -154,6 +163,20 @@
             <div class="panel-head">
               <p class="crumb"><span>Captions</span><span class="crumb-sep">/</span><b>Presets</b></p>
               <span id="presetsChip" class="chip"></span>
+            </div>
+            <div class="screen-section">
+              <p class="label">Built-in</p>
+              <div id="builtInPresets" class="preset-list"></div>
+            </div>
+            <div class="screen-section">
+              <p class="label">Your presets</p>
+              <div id="customPresets" class="preset-list"></div>
+              <div id="customPresetsEmpty" class="empty-box"><b>No presets of your own yet.</b><p>Set a style on the Captions screen, then name it below.</p></div>
+            </div>
+            <div class="screen-section">
+              <label for="newPresetName" class="label">New preset from the current style</label>
+              <div class="name-row"><input id="newPresetName" class="text-field" type="text" maxlength="24" placeholder="Name" autocomplete="off"><button id="savePreset" class="primary-button compact" type="button">Save</button></div>
+              <p id="presetNameError" class="field-error" role="alert" hidden></p>
             </div>
           </article>
         </div>

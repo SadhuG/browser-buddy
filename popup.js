@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const BB = globalThis.BrowserBuddy;
-const state = { settings: BB.settings.normalizeSettings({}), scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false, closedRows: [] };
+const state = { settings: BB.settings.normalizeSettings({}), tabStatus: null, editingPresetId: null, renamingPresetId: null, savePromptDismissed: false, scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false, closedRows: [] };
 const UNDO_MS = 8000;
 const FOLD_MS = 180;
 
@@ -10,7 +10,7 @@ async function init() {
   bindNavigation();
   bindYoutubeControls();
   bindTabControls();
-  await Promise.all([loadYoutubeState(), loadVideoSettings(), loadAmazonCartState()]);
+  await Promise.all([loadYoutubeState(), loadVideoSettings(), loadAmazonCartState(), loadTabStatus()]);
 }
 
 function bindNavigation() {
@@ -38,6 +38,7 @@ function bindYoutubeControls() {
   buildQualityOptions();
   bindCaptionControls();
   bindAudioControls();
+  bindPresetControls();
   document.querySelectorAll('.back-to-captions').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('captionsScreen')));
 }
 
@@ -69,6 +70,8 @@ function renderVideoSettings() {
   renderQualityScreen(state.settings);
   renderCaptionsScreen(state.settings);
   renderAudioScreen(state.settings);
+  renderPresetsScreen(state.settings);
+  renderSavePrompt(state.settings);
 }
 const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
 const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
@@ -157,14 +160,20 @@ function renderAudioScreen(settings) {
 const NUMERIC_STYLE_FIELDS = ['fontFamily', 'textOpacity', 'backgroundOpacity', 'windowOpacity', 'charEdgeStyle', 'sizePercent'];
 function setStyleField(field, raw) {
   const value = NUMERIC_STYLE_FIELDS.includes(field) ? Number(raw) : raw;
-  saveSettings({ captionStyle: { ...state.settings.captionStyle, [field]: value }, captionPresetId: null });
+  const captionStyle = { ...state.settings.captionStyle, [field]: value };
+  const id = state.editingPresetId;
+  if (!id) { saveSettings({ captionStyle, captionPresetId: null }); return; }
+  // Editing a preset: the change goes into the preset, which stays the active style.
+  const { state: presets } = BB.presets.updatePresetStyle(presetState(), id, captionStyle);
+  saveSettings({ captionStyle, captionPresetId: id, ...presets });
 }
-function pickPreset(id) { saveSettings(BB.presets.applyPreset(state.settings, id)); }
+function pickPreset(id) { state.editingPresetId = null; saveSettings(BB.presets.applyPreset(state.settings, id)); }
 function bindCaptionControls() {
   const CS = BB.captionStyle;
   document.querySelectorAll('#captionsMode button').forEach((button) => button.addEventListener('click', () => saveSettings({ captionsMode: button.dataset.mode })));
   $('#captionStyleEnabled').addEventListener('change', (event) => saveSettings({ captionStyleEnabled: event.target.checked }));
   $('#resetCaptionStyle').addEventListener('click', () => pickPreset('classic'));
+  $('#doneEditing').addEventListener('click', () => showYoutubeScreen('presetsScreen'));
   $('#managePresets').addEventListener('click', () => showYoutubeScreen('presetsScreen'));
   const options = (select, list, field) => {
     select.replaceChildren(...list.map((item) => { const option = element('option', '', item.label); option.value = item.value; return option; }));
@@ -212,6 +221,9 @@ function renderCaptionsScreen(settings) {
   document.querySelectorAll('#captionsMode button').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.captionsMode)));
   $('#captionStyleEnabled').checked = settings.captionStyleEnabled;
   $('#captionStyleControls').classList.toggle('is-off', !settings.captionStyleEnabled);
+  const editing = BB.presets.listPresets(settings).find((preset) => preset.id === state.editingPresetId);
+  $('#editingPreset').hidden = !editing;
+  $('#editingPresetName').textContent = editing?.name || '';
   $('#captionWindow').style.backgroundColor = applyPreviewCss($('#captionPreview'), style).windowColor;
   $('#presetPicker').replaceChildren(...BB.presets.listPresets(settings).map((preset) => presetTile(preset, preset.id === settings.captionPresetId)));
   $('#capFont').value = String(style.fontFamily);
@@ -220,14 +232,165 @@ function renderCaptionsScreen(settings) {
     button.setAttribute('aria-pressed', String(button.dataset.value === String(style[group.dataset.field])))));
 }
 
+// Presets: create from the current style, rename and delete your own, edit any preset, and
+// reset an edited built-in. lib/presets.js does the bookkeeping; the popup only stores results.
+const PRESET_ERRORS = {
+  empty: () => 'Type a name first.',
+  'too-long': () => `Use ${BB.presets.MAX_NAME} characters or fewer.`,
+  duplicate: (name) => `A preset named ${name.trim()} already exists.`,
+  limit: () => `You can keep ${BB.presets.MAX_CUSTOM} presets. Delete one first.`,
+};
+function presetState() { return { customPresets: state.settings.customPresets, builtInPresetEdits: state.settings.builtInPresetEdits }; }
+function newPresetId() { return `custom-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; }
+function showFieldError(input, message, errorNode) {
+  errorNode.textContent = message || '';
+  errorNode.hidden = !message;
+  input.setAttribute('aria-invalid', String(!!message));
+}
+function createPresetFrom(input, errorNode, style, { activate }) {
+  const name = input.value;
+  const id = newPresetId();
+  const result = BB.presets.createPreset(presetState(), name, style, id);
+  if (result.error) { showFieldError(input, PRESET_ERRORS[result.error](name), errorNode); input.focus(); return false; }
+  showFieldError(input, '', errorNode);
+  input.value = '';
+  saveSettings({ customPresets: result.state.customPresets, ...(activate ? { captionStyle: result.preset.style, captionPresetId: id } : {}) });
+  return true;
+}
+function bindPresetControls() {
+  const create = () => createPresetFrom($('#newPresetName'), $('#presetNameError'), state.settings.captionStyle, { activate: true });
+  $('#savePreset').addEventListener('click', create);
+  $('#newPresetName').addEventListener('keydown', (event) => { if (event.key === 'Enter') create(); });
+  $('#newPresetName').addEventListener('input', () => showFieldError($('#newPresetName'), '', $('#presetNameError')));
+  $('#saveTouchedPreset').addEventListener('click', () => {
+    if (createPresetFrom($('#touchedPresetName'), $('#touchedPresetError'), state.tabStatus.touched.captionStyle, { activate: false })) dismissSavePrompt();
+  });
+  $('#dismissSavePrompt').addEventListener('click', dismissSavePrompt);
+}
+function dismissSavePrompt() {
+  state.savePromptDismissed = true;
+  renderSavePrompt(state.settings);
+  $('#captionsScreen .back-link').focus();
+}
+function editPreset(id) {
+  state.editingPresetId = id;
+  state.lastEditedPresetId = id;
+  saveSettings(BB.presets.applyPreset(state.settings, id));
+  showYoutubeScreen('captionsScreen');
+}
+function resetPreset(id) {
+  const { state: presets } = BB.presets.resetBuiltIn(presetState(), id);
+  const original = BB.captionStyle.BUILT_IN_PRESETS.find((preset) => preset.id === id).style;
+  saveSettings({ ...presets, ...(state.settings.captionPresetId === id ? { captionStyle: original } : {}) });
+  $(`[data-preset-id="${id}"] .edit`)?.focus();
+}
+function deletePreset(id) {
+  const { state: presets } = BB.presets.deletePreset(presetState(), id);
+  saveSettings({ ...presets, ...BB.presets.afterDelete(state.settings, id) });
+  $('#newPresetName').focus();
+}
+function startRename(id) {
+  state.renamingPresetId = id;
+  renderPresetsScreen(state.settings);
+  const input = $(`[data-preset-id="${id}"] .text-field`);
+  input.focus();
+  input.select();
+}
+function finishRename(id, name, commit) {
+  if (state.renamingPresetId !== id) return;
+  const preset = state.settings.customPresets.find((p) => p.id === id);
+  if (commit && name.trim() !== preset.name) {
+    const result = BB.presets.renamePreset(presetState(), id, name);
+    if (result.error) { showFieldError($(`[data-preset-id="${id}"] .text-field`), PRESET_ERRORS[result.error](name), $('#presetNameError')); return; }
+    state.renamingPresetId = null;
+    showFieldError($('#newPresetName'), '', $('#presetNameError'));
+    saveSettings({ customPresets: result.state.customPresets });
+  } else {
+    state.renamingPresetId = null;
+    showFieldError($('#newPresetName'), '', $('#presetNameError'));
+    renderPresetsScreen(state.settings);
+  }
+  $(`[data-preset-id="${id}"] .rename`)?.focus();
+}
+function presetAction(className, label, name, onClick) {
+  const button = element('button', `text-link ${className}`, label); button.type = 'button';
+  button.setAttribute('aria-label', `${label} ${name}`);
+  button.addEventListener('click', onClick);
+  return button;
+}
+function presetRow(preset, active) {
+  const row = element('div', `preset-row${active ? ' is-active' : ''}`); row.dataset.presetId = preset.id;
+  const sample = element('span', 'preset-sample'); sample.setAttribute('aria-hidden', 'true');
+  const text = element('span', '', 'Aa'); applyPreviewCss(text, preset.style); sample.append(text);
+  const copy = element('span', 'preset-text');
+  if (state.renamingPresetId === preset.id) {
+    const input = element('input', 'text-field'); input.type = 'text'; input.value = preset.name; input.maxLength = BB.presets.MAX_NAME;
+    input.setAttribute('aria-label', `New name for ${preset.name}`);
+    input.addEventListener('keydown', (event) => {
+      // preventDefault: focus moves to the Rename button, which this Enter would otherwise click.
+      if (event.key === 'Enter') { event.preventDefault(); finishRename(preset.id, input.value, true); }
+      if (event.key === 'Escape') { event.preventDefault(); finishRename(preset.id, input.value, false); }
+    });
+    input.addEventListener('blur', () => finishRename(preset.id, input.value, true));
+    copy.append(input);
+  } else copy.append(element('b', '', preset.name));
+  const note = [active && 'active', preset.edited && 'edited'].filter(Boolean).join(', ');
+  if (note) copy.append(element('small', '', note));
+  const actions = element('span', 'preset-actions');
+  actions.append(presetAction('edit', 'Edit', preset.name, () => editPreset(preset.id)));
+  if (preset.builtIn && preset.edited) actions.append(presetAction('reset', 'Reset', preset.name, () => resetPreset(preset.id)));
+  if (!preset.builtIn) actions.append(presetAction('rename', 'Rename', preset.name, () => startRename(preset.id)), presetAction('delete', 'Delete', preset.name, () => deletePreset(preset.id)));
+  row.append(sample, copy, actions);
+  return row;
+}
+function renderPresetsScreen(settings) {
+  const presets = BB.presets.listPresets(settings);
+  const custom = presets.filter((preset) => !preset.builtIn);
+  $('#presetsChip').textContent = custom.length ? `${custom.length} of yours` : 'none of yours';
+  $('#builtInPresets').replaceChildren(...presets.filter((preset) => preset.builtIn).map((preset) => presetRow(preset, preset.id === settings.captionPresetId)));
+  $('#customPresets').replaceChildren(...custom.map((preset) => presetRow(preset, preset.id === settings.captionPresetId)));
+  $('#customPresetsEmpty').hidden = !!custom.length;
+}
+// "Save as preset?" appears once per popup opening when the active video's caption style was
+// changed in YouTube's player. Nothing is saved without a tap.
+const COLOR_NAMES = Object.fromEntries(BB.captionStyle.COLORS.map((color) => [color.value, color.label]));
+function suggestPresetName(style) {
+  const base = style.backgroundOpacity > 0 ? `${COLOR_NAMES[style.color]} on ${COLOR_NAMES[style.background].toLowerCase()}` : `${COLOR_NAMES[style.color]} text`;
+  for (let n = 1; n < 50; n++) {
+    const name = n === 1 ? base : `${base} ${n}`;
+    if (!BB.presets.validateName(presetState(), name)) return name;
+  }
+  return '';
+}
+function renderSavePrompt(settings) {
+  const touched = state.tabStatus?.touched?.captionStyle;
+  const show = !!touched && !state.savePromptDismissed;
+  const prompt = $('#savePresetPrompt');
+  const wasHidden = prompt.hidden;
+  prompt.hidden = !show;
+  if (!show) return;
+  const style = BB.captionStyle.normalizeStyle(touched);
+  $('#touchedWindow').style.backgroundColor = applyPreviewCss($('#touchedPreview'), style).windowColor;
+  if (wasHidden) $('#touchedPresetName').value = suggestPresetName(style);
+}
+async function loadTabStatus() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    state.tabStatus = tab && /^https:\/\/(www|m)\.youtube\.com\//.test(tab.url || '') ? await chrome.tabs.sendMessage(tab.id, { type: 'GET_TAB_STATUS' }) : null;
+  } catch (_) { state.tabStatus = null; }
+  renderVideoSettings();
+}
+
 // One YouTube screen at a time: the home view or one sub-screen. Going back focuses the row
 // that opened the screen, so keyboard users land where they left.
 function showYoutubeScreen(id) {
   const from = document.querySelector('#youtubeHome:not([hidden]), .yt-screen:not([hidden])')?.id;
+  if (from === 'captionsScreen' && id !== 'captionsScreen' && state.editingPresetId) { state.editingPresetId = null; renderVideoSettings(); }
   document.querySelectorAll('#youtubeHome, .yt-screen').forEach((screen) => { screen.hidden = screen.id !== id; });
   if (from === id) return;
   const rowFor = { qualityScreen: '#qualityRow', audioScreen: '#audioRow', captionsScreen: '#captionsRow' };
   if (id === 'youtubeHome' && rowFor[from]) $(rowFor[from]).focus();
+  else if (id === 'presetsScreen' && from === 'captionsScreen' && state.lastEditedPresetId) $(`[data-preset-id="${state.lastEditedPresetId}"] .edit`)?.focus();
   else if (id !== 'youtubeHome') $(`#${id} .back-link`).focus();
 }
 
