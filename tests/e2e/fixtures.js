@@ -70,4 +70,12 @@ function messageTab(popup, message, target) {
 const tabStatus = (popup, target) => messageTab(popup, { type: 'GET_TAB_STATUS' }, target);
 const clearTouch = (popup, setting, target) => messageTab(popup, { type: 'CLEAR_TOUCH', setting }, target);
 
-module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, tabStatus, clearTouch };
+// Make `page` the active tab, then reopen the popup page so it reads that tab's status, as the
+// toolbar popup would. The popup page stays a background tab in the same window.
+async function openPopupForTab(popup, page) {
+  await page.bringToFront();
+  await popup.reload();
+  return popup;
+}
+
+module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, tabStatus, clearTouch, openPopupForTab };

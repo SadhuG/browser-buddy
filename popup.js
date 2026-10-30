@@ -71,7 +71,7 @@ function renderVideoSettings() {
   renderCaptionsScreen(state.settings);
   renderAudioScreen(state.settings);
   renderPresetsScreen(state.settings);
-  renderSavePrompt(state.settings);
+  renderStatus();
 }
 const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
 const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
@@ -376,10 +376,76 @@ function renderSavePrompt(settings) {
 async function loadTabStatus() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    state.statusTabId = tab?.id;
     state.tabStatus = tab && /^https:\/\/(www|m)\.youtube\.com\//.test(tab.url || '') ? await chrome.tabs.sendMessage(tab.id, { type: 'GET_TAB_STATUS' }) : null;
   } catch (_) { state.tabStatus = null; }
-  renderVideoSettings();
+  renderStatus();
 }
+// This-video notes, from the active tab's status. One touch-note component serves the Speed
+// panel and the three screens; rows show a short line, and their screens hold the action.
+const QUALITY_HEIGHTS = { tiny: 144, small: 240, medium: 360, large: 480, hd720: 720, hd1080: 1080, hd1440: 1440, hd2160: 2160, highres: 4320 };
+const qualityLabel = (quality) => (QUALITY_HEIGHTS[quality] ? `${QUALITY_HEIGHTS[quality]}p` : quality);
+const AUTO_REASON = { miniplayer: 'in miniplayer', battery: 'on battery' };
+function touchNote(setting, text) {
+  const note = element('div', 'touch-note'); note.dataset.setting = setting; note.setAttribute('role', 'status');
+  const copy = element('div');
+  const action = element('button', 'use-bb-setting', 'Use Browser Buddy setting'); action.type = 'button';
+  action.addEventListener('click', () => useBrowserBuddySetting(setting));
+  copy.append(element('p', '', text), action);
+  note.append(element('span', 'note-dot'), copy);
+  return note;
+}
+function quietNote(kind, setting, text) { const note = element('p', kind, text); note.dataset.setting = setting; return note; }
+function strip(...notes) {
+  const present = notes.filter(Boolean);
+  if (!present.length) return null;
+  const box = element('div', 'video-strip'); box.append(...present);
+  return box;
+}
+function rowNote(setting, text) {
+  const note = element('span', 'row-note'); note.dataset.setting = setting;
+  note.append(element('span', 'note-dot'), element('span', '', text));
+  return note;
+}
+function videoNotes(status) {
+  const { touched = {}, auto = {}, unavailable = {} } = status || {};
+  const autoQuality = auto.quality && `${auto.quality.height}p ${AUTO_REASON[auto.quality.reason] || ''}`.trim();
+  return {
+    speed: [touched.speed !== undefined && touchNote('speed', `This video: ${Number(touched.speed)}× set in player`)],
+    quality: [
+      touched.quality && touchNote('quality', `This video: ${qualityLabel(touched.quality)} set in player`),
+      strip(unavailable.quality && quietNote('unavailable-note', 'quality', `This video tops out at ${unavailable.quality.maxHeight}p.`),
+        autoQuality && quietNote('auto-note', 'quality', `Playing ${autoQuality}`)),
+    ],
+    audio: [
+      touched.audio !== undefined && touchNote('audio', 'This video: audio track set in player'),
+      strip(unavailable.audio && quietNote('unavailable-note', 'audio', 'No other audio tracks on this video.')),
+    ],
+    captions: [
+      touched.captions !== undefined && touchNote('captions', 'This video: captions set in player'),
+      touched.captionStyle && touchNote('captionStyle', 'This video: caption style set in player'),
+      strip(unavailable.captions && quietNote('unavailable-note', 'captions', 'No captions available on this video.')),
+    ],
+    qualityRow: [touched.quality ? rowNote('quality', `This video: ${qualityLabel(touched.quality)} set in player`) : autoQuality && quietNote('auto-note', 'quality', autoQuality)],
+    audioRow: [touched.audio !== undefined && rowNote('audio', 'This video: audio track set in player')],
+    captionsRow: [(touched.captions !== undefined || touched.captionStyle) && rowNote('captions', `This video: ${touched.captionStyle ? 'style' : 'captions'} set in player`)],
+  };
+}
+function renderStatus() {
+  const notes = videoNotes(state.tabStatus);
+  document.querySelectorAll('.note-slot').forEach((slot) => slot.replaceChildren(...notes[slot.dataset.slot].filter(Boolean)));
+  ['qualityRow', 'audioRow', 'captionsRow'].forEach((row) => $(`#${row} .row-notes`).replaceChildren(...notes[row].filter(Boolean)));
+  renderSavePrompt(state.settings);
+}
+async function useBrowserBuddySetting(setting) {
+  const tabId = state.statusTabId;
+  if (state.tabStatus?.touched) delete state.tabStatus.touched[setting];
+  renderStatus();
+  const screen = document.querySelector('.yt-screen:not([hidden])');
+  (screen ? screen.querySelector('.back-link') : $('#speedSlider')).focus();
+  try { await chrome.tabs.sendMessage(tabId, { type: 'CLEAR_TOUCH', setting }); } catch (_) { /* the tab went away */ }
+}
+
 
 // One YouTube screen at a time: the home view or one sub-screen. Going back focuses the row
 // that opened the screen, so keyboard users land where they left.
