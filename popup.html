@@ -89,6 +89,16 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Audio</b></p>
               <span id="audioChip" class="chip"></span>
             </div>
+            <div class="setting-row screen-rule">
+              <div class="row-text"><h2 id="audioTrackTitle">Choose audio track</h2><p id="audioTrackDescription">Off lets YouTube pick, as before.</p></div>
+              <label class="toggle"><input id="audioTrackEnabled" type="checkbox" aria-labelledby="audioTrackTitle" aria-describedby="audioTrackDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+            </div>
+            <div class="screen-section">
+              <div class="label-row"><p id="myLanguagesLabel" class="label">My languages</p><small class="faint-note">also picks captions</small></div>
+              <ol id="myLanguages" class="language-list" aria-labelledby="myLanguagesLabel"></ol>
+              <select id="addLanguage" class="select add-language" aria-label="Add language"></select>
+              <p class="screen-intro">Originals in your languages play as they are. Anything else plays your first available dub, or the original with captions.</p>
+            </div>
           </article>
         </div>
         <div id="captionsScreen" class="yt-screen view-stack" hidden>

@@ -37,6 +37,7 @@ function bindYoutubeControls() {
   document.querySelectorAll('.back-to-youtube').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('youtubeHome')));
   buildQualityOptions();
   bindCaptionControls();
+  bindAudioControls();
   document.querySelectorAll('.back-to-captions').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('captionsScreen')));
 }
 
@@ -67,6 +68,7 @@ function renderVideoSettings() {
   renderYoutubeSummary(state.settings);
   renderQualityScreen(state.settings);
   renderCaptionsScreen(state.settings);
+  renderAudioScreen(state.settings);
 }
 const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
 const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
@@ -96,6 +98,58 @@ function buildQualityOptions() {
 function renderQualityScreen(settings) {
   $('#qualityChip').textContent = qualityText(settings.quality);
   document.querySelectorAll('input[name=quality]').forEach((input) => { input.checked = input.value === settings.quality; });
+}
+
+// Audio: My languages is ranked; it picks the audio track and the caption language. Reordering
+// uses buttons so it works from the keyboard. Languages offered for adding: YouTube's dub
+// languages plus the most common caption languages, minus those already on the list.
+const ADDABLE_LANGUAGES = ['en', 'hi', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'id', 'zh', 'ar', 'ru', 'tr', 'vi', 'th', 'nl', 'pl', 'sv', 'uk',
+  'bn', 'ta', 'te', 'mr', 'ur', 'gu', 'kn', 'ml', 'pa', 'fa', 'he', 'el', 'cs', 'ro', 'hu', 'ms', 'fil', 'da', 'fi', 'no'];
+function setLanguages(myLanguages) { saveSettings({ myLanguages }); }
+function moveLanguage(index, by) {
+  const list = [...state.settings.myLanguages];
+  [list[index], list[index + by]] = [list[index + by], list[index]];
+  setLanguages(list);
+  // The list re-renders, so put focus back on the moved language's buttons.
+  const moved = `#myLanguages [data-lang="${list[index + by]}"]`;
+  const same = $(`${moved} ${by < 0 ? '.move-up' : '.move-down'}`);
+  (same.disabled ? $(`${moved} ${by < 0 ? '.move-down' : '.move-up'}`) : same).focus();
+}
+function bindAudioControls() {
+  $('#audioTrackEnabled').addEventListener('change', (event) => saveSettings({ audioTrackEnabled: event.target.checked }));
+  $('#addLanguage').addEventListener('change', (event) => {
+    const code = event.target.value;
+    if (code) setLanguages([...state.settings.myLanguages, code]);
+  });
+}
+function languageButton(className, symbol, label, disabled, onClick) {
+  const button = element('button', className, symbol); button.type = 'button'; button.disabled = disabled;
+  button.setAttribute('aria-label', label); button.title = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+function renderAudioScreen(settings) {
+  const languages = settings.myLanguages;
+  $('#audioChip').textContent = settings.audioTrackEnabled ? 'on' : 'off';
+  $('#audioTrackEnabled').checked = settings.audioTrackEnabled;
+  $('#myLanguages').replaceChildren(...languages.map((code, index) => {
+    const name = languageName(code);
+    const item = element('li', 'language-item'); item.dataset.lang = code;
+    const actions = element('span', 'language-actions');
+    actions.append(
+      languageButton('move-up', '↑\uFE0E', `Move ${name} up`, index === 0, () => moveLanguage(index, -1)),
+      languageButton('move-down', '↓\uFE0E', `Move ${name} down`, index === languages.length - 1, () => moveLanguage(index, 1)),
+      languageButton('remove', '×\uFE0E', `Remove ${name}`, languages.length === 1, () => setLanguages(languages.filter((c) => c !== code))),
+    );
+    item.append(element('span', 'language-rank', String(index + 1)), element('span', 'language-name', name), actions);
+    return item;
+  }));
+  const placeholder = element('option', '', '+ Add language'); placeholder.value = '';
+  const addable = ADDABLE_LANGUAGES.filter((code) => !languages.includes(code)).map((code) => [code, languageName(code)])
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  $('#addLanguage').replaceChildren(placeholder, ...addable.map(([code, name]) => { const option = element('option', '', name); option.value = code; return option; }));
+  $('#addLanguage').value = '';
+  $('#addLanguage').disabled = languages.length >= 10;
 }
 
 // Captions: mode, style switch, preview, presets and the style values YouTube offers. Any control
