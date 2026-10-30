@@ -24,6 +24,7 @@
       </header>
 
       <section id="youtube" class="view is-active" aria-label="YouTube controls">
+        <div id="youtubeHome" class="view-stack">
         <article class="panel">
           <div class="panel-head">
             <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Playback speed</b></p>
@@ -46,6 +47,12 @@
           </div>
         </article>
 
+        <article class="panel" aria-label="Video defaults">
+          <button id="qualityRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Resolution</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
+          <button id="audioRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Audio</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
+          <button id="captionsRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Captions</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
+        </article>
+
         <article class="panel">
           <div class="setting-row">
             <div class="row-text"><h2 id="tutorialTitle">Tutorial mode</h2><p id="tutorialDescription">Pause on tab leave, play on return.</p></div>
@@ -56,6 +63,44 @@
             <label class="toggle"><input id="subscriptionCleanMode" type="checkbox" aria-labelledby="subscriptionCleanTitle" aria-describedby="subscriptionCleanDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
           </div>
         </article>
+        </div>
+
+        <div id="qualityScreen" class="yt-screen view-stack" hidden>
+          <button class="back-link back-to-youtube" type="button">← YouTube</button>
+          <article class="panel">
+            <div class="panel-head">
+              <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Resolution</b></p>
+              <span id="qualityChip" class="chip"></span>
+            </div>
+          </article>
+        </div>
+        <div id="audioScreen" class="yt-screen view-stack" hidden>
+          <button class="back-link back-to-youtube" type="button">← YouTube</button>
+          <article class="panel">
+            <div class="panel-head">
+              <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Audio</b></p>
+              <span id="audioChip" class="chip"></span>
+            </div>
+          </article>
+        </div>
+        <div id="captionsScreen" class="yt-screen view-stack" hidden>
+          <button class="back-link back-to-youtube" type="button">← YouTube</button>
+          <article class="panel">
+            <div class="panel-head">
+              <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Captions</b></p>
+              <span id="captionsChip" class="chip"></span>
+            </div>
+          </article>
+        </div>
+        <div id="presetsScreen" class="yt-screen view-stack" hidden>
+          <button class="back-link back-to-captions" type="button">← Captions</button>
+          <article class="panel">
+            <div class="panel-head">
+              <p class="crumb"><span>Captions</span><span class="crumb-sep">/</span><b>Presets</b></p>
+              <span id="presetsChip" class="chip"></span>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section id="tabs" class="view" aria-label="Tab tools">
@@ -123,6 +168,13 @@
       </section>
     </div>
     <script src="lib/duplicate-tabs.js"></script>
+    <script src="lib/caption-style.js"></script>
+    <script src="lib/languages.js"></script>
+    <script src="lib/settings.js"></script>
+    <script src="lib/quality.js"></script>
+    <script src="lib/caption-track.js"></script>
+    <script src="lib/audio-track.js"></script>
+    <script src="lib/presets.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
