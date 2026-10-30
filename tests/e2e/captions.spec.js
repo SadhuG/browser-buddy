@@ -1,4 +1,4 @@
-const { test, expect, openStubVideo, tabStatus, setSetting } = require('./fixtures');
+const { test, expect, openStubVideo, tabStatus, setSetting, clearTouch } = require('./fixtures');
 
 const T = (languageCode, kind = '') => ({ languageCode, kind, languageName: languageCode, vss_id: `${kind === 'asr' ? 'a' : ''}.${languageCode}` });
 const L = (languageCode) => ({ languageCode, languageName: languageCode });
@@ -96,4 +96,16 @@ test('a click that skips an ad does not count as a touch', async ({ context, pop
   await tick(page);
   expect((await status(popup, page)).touched?.captions).toBeUndefined();
   await expect.poll(() => isOn(page), { timeout: 6000 }).toBe(true);
+});
+
+// "Use Browser Buddy setting" is newer than the player click before it, so it isn't undone.
+test('Use Browser Buddy setting right after a player click restores captions', async ({ context, popup }) => {
+  const page = await open(context, popup, 'on');
+  await expect.poll(() => isOn(page)).toBe(true);
+  await page.click('#movie_player');
+  await page.evaluate(() => { window.__bbStub.userSetCaptions(false); window.BrowserBuddy.bridge.tick(); });
+  expect((await status(popup, page)).touched?.captions).toBe('off');
+  await clearTouch(popup, 'captions', page);
+  await expect.poll(() => isOn(page)).toBe(true);
+  expect((await status(popup, page)).touched?.captions).toBeUndefined();
 });
