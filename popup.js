@@ -36,6 +36,7 @@ function bindYoutubeControls() {
     $(row).addEventListener('click', () => showYoutubeScreen(screen)));
   document.querySelectorAll('.back-to-youtube').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('youtubeHome')));
   buildQualityOptions();
+  bindCaptionControls();
   document.querySelectorAll('.back-to-captions').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('captionsScreen')));
 }
 
@@ -65,6 +66,7 @@ async function saveSettings(patch) {
 function renderVideoSettings() {
   renderYoutubeSummary(state.settings);
   renderQualityScreen(state.settings);
+  renderCaptionsScreen(state.settings);
 }
 const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
 const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
@@ -94,6 +96,74 @@ function buildQualityOptions() {
 function renderQualityScreen(settings) {
   $('#qualityChip').textContent = qualityText(settings.quality);
   document.querySelectorAll('input[name=quality]').forEach((input) => { input.checked = input.value === settings.quality; });
+}
+
+// Captions: mode, style switch, preview, presets and the style values YouTube offers. Any control
+// change makes the style Custom (captionPresetId null); presets and Reset copy a whole style.
+const NUMERIC_STYLE_FIELDS = ['fontFamily', 'textOpacity', 'backgroundOpacity', 'windowOpacity', 'charEdgeStyle', 'sizePercent'];
+function setStyleField(field, raw) {
+  const value = NUMERIC_STYLE_FIELDS.includes(field) ? Number(raw) : raw;
+  saveSettings({ captionStyle: { ...state.settings.captionStyle, [field]: value }, captionPresetId: null });
+}
+function pickPreset(id) { saveSettings(BB.presets.applyPreset(state.settings, id)); }
+function bindCaptionControls() {
+  const CS = BB.captionStyle;
+  document.querySelectorAll('#captionsMode button').forEach((button) => button.addEventListener('click', () => saveSettings({ captionsMode: button.dataset.mode })));
+  $('#captionStyleEnabled').addEventListener('change', (event) => saveSettings({ captionStyleEnabled: event.target.checked }));
+  $('#resetCaptionStyle').addEventListener('click', () => pickPreset('classic'));
+  $('#managePresets').addEventListener('click', () => showYoutubeScreen('presetsScreen'));
+  const options = (select, list, field) => {
+    select.replaceChildren(...list.map((item) => { const option = element('option', '', item.label); option.value = item.value; return option; }));
+    select.addEventListener('change', () => setStyleField(field, select.value));
+  };
+  options($('#capFont'), CS.FONT_FAMILIES, 'fontFamily');
+  options($('#capEdge'), CS.EDGE_STYLES, 'charEdgeStyle');
+  ['#capColor', '#capBackground', '#capWindowColor'].forEach((id) => $(id).replaceChildren(...CS.COLORS.map((color) => {
+    const swatch = element('button', 'swatch'); swatch.type = 'button'; swatch.dataset.value = color.value;
+    swatch.setAttribute('aria-label', color.label); swatch.title = color.label;
+    const chip = element('span'); chip.style.background = color.value; swatch.append(chip);
+    return swatch;
+  })));
+  const segments = (id, list) => $(id).replaceChildren(...list.map((item) => {
+    const button = element('button', '', item.label); button.type = 'button'; button.dataset.value = item.value; return button;
+  }));
+  segments('#capTextOpacity', CS.TEXT_OPACITIES);
+  segments('#capBackgroundOpacity', CS.FILL_OPACITIES);
+  segments('#capWindowOpacity', CS.FILL_OPACITIES);
+  segments('#capSize', CS.SIZE_STEPS.map((step) => ({ value: step.percent, label: `${step.percent}%` })));
+  document.querySelectorAll('#captionStyleControls [data-field]').forEach((group) => group.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-value]');
+    if (button) setStyleField(group.dataset.field, button.dataset.value);
+  }));
+}
+function applyPreviewCss(node, style) {
+  const css = BB.captionStyle.previewCss(style);
+  Object.assign(node.style, { color: css.color, backgroundColor: css.backgroundColor, fontFamily: css.fontFamily, fontVariant: css.fontVariant, fontSize: css.fontSize, textShadow: css.textShadow });
+  return css;
+}
+function presetTile(preset, active) {
+  const tile = element('button', 'preset-tile'); tile.type = 'button'; tile.dataset.preset = preset.id;
+  tile.setAttribute('aria-pressed', String(active));
+  const sample = element('span', 'preset-sample'); sample.setAttribute('aria-hidden', 'true');
+  const text = element('span', '', 'Aa'); applyPreviewCss(text, preset.style); sample.append(text);
+  const meta = element('span', 'preset-meta'); meta.append(element('b', '', preset.name));
+  if (active) meta.append(element('small', '', 'active'));
+  tile.append(sample, meta);
+  tile.addEventListener('click', () => pickPreset(preset.id));
+  return tile;
+}
+function renderCaptionsScreen(settings) {
+  const style = settings.captionStyle;
+  $('#captionsChip').textContent = settings.captionStyleEnabled ? presetName(settings) : 'Style off';
+  document.querySelectorAll('#captionsMode button').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.captionsMode)));
+  $('#captionStyleEnabled').checked = settings.captionStyleEnabled;
+  $('#captionStyleControls').classList.toggle('is-off', !settings.captionStyleEnabled);
+  $('#captionWindow').style.backgroundColor = applyPreviewCss($('#captionPreview'), style).windowColor;
+  $('#presetPicker').replaceChildren(...BB.presets.listPresets(settings).map((preset) => presetTile(preset, preset.id === settings.captionPresetId)));
+  $('#capFont').value = String(style.fontFamily);
+  $('#capEdge').value = String(style.charEdgeStyle);
+  document.querySelectorAll('#captionStyleControls [data-field]').forEach((group) => group.querySelectorAll('button[data-value]').forEach((button) =>
+    button.setAttribute('aria-pressed', String(button.dataset.value === String(style[group.dataset.field])))));
 }
 
 // One YouTube screen at a time: the home view or one sub-screen. Going back focuses the row

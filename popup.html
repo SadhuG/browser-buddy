@@ -98,6 +98,44 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Captions</b></p>
               <span id="captionsChip" class="chip"></span>
             </div>
+            <div class="screen-section">
+              <p id="captionsModeLabel" class="label">Show captions</p>
+              <div id="captionsMode" class="seg-control" role="group" aria-labelledby="captionsModeLabel">
+                <button data-mode="youtube" type="button">YouTube decides</button><button data-mode="on" type="button">Always on</button><button data-mode="off" type="button">Always off</button>
+              </div>
+            </div>
+            <div class="setting-row screen-rule">
+              <div class="row-text"><h2 id="captionStyleTitle">Style captions</h2><p id="captionStyleDescription">Off leaves YouTube’s own style alone.</p></div>
+              <label class="toggle"><input id="captionStyleEnabled" type="checkbox" aria-labelledby="captionStyleTitle" aria-describedby="captionStyleDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+            </div>
+            <div id="captionStyleControls">
+              <div class="screen-section no-rule">
+                <div class="video-swatch" role="img" aria-label="Caption preview"><span id="captionWindow" class="caption-window"><span id="captionPreview" class="caption-cue">Captions look like this on every video.</span></span><span class="video-progress" aria-hidden="true"></span></div>
+              </div>
+              <div class="screen-section">
+                <div class="label-row"><p class="label">Presets</p><button id="managePresets" class="text-link" type="button">Manage presets</button></div>
+                <div id="presetPicker" class="preset-grid" role="group" aria-label="Caption presets"></div>
+              </div>
+              <div class="screen-section">
+                <p class="label">Text</p>
+                <div class="control-row"><label for="capFont">Font</label><select id="capFont" class="select"></select></div>
+                <div class="control-row"><span aria-hidden="true">Color</span><div id="capColor" class="swatches" role="group" aria-label="Text color" data-field="color"></div></div>
+                <div class="control-row"><span aria-hidden="true">Opacity</span><div id="capTextOpacity" class="seg-control" role="group" aria-label="Text opacity" data-field="textOpacity"></div></div>
+                <div class="control-row"><span aria-hidden="true">Size</span><div id="capSize" class="seg-control" role="group" aria-label="Text size" data-field="sizePercent"></div></div>
+                <div class="control-row"><label for="capEdge">Edge</label><select id="capEdge" class="select"></select></div>
+              </div>
+              <div class="screen-section">
+                <p class="label">Background</p>
+                <div class="control-row"><span aria-hidden="true">Color</span><div id="capBackground" class="swatches" role="group" aria-label="Background color" data-field="background"></div></div>
+                <div class="control-row"><span aria-hidden="true">Opacity</span><div id="capBackgroundOpacity" class="seg-control" role="group" aria-label="Background opacity" data-field="backgroundOpacity"></div></div>
+              </div>
+              <div class="screen-section">
+                <p class="label">Window</p>
+                <div class="control-row"><span aria-hidden="true">Color</span><div id="capWindowColor" class="swatches" role="group" aria-label="Window color" data-field="windowColor"></div></div>
+                <div class="control-row"><span aria-hidden="true">Opacity</span><div id="capWindowOpacity" class="seg-control" role="group" aria-label="Window opacity" data-field="windowOpacity"></div></div>
+              </div>
+              <div class="screen-section"><div><button id="resetCaptionStyle" class="button" type="button">Reset to Classic</button></div></div>
+            </div>
           </article>
         </div>
         <div id="presetsScreen" class="yt-screen view-stack" hidden>
