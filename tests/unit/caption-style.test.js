@@ -52,3 +52,16 @@ test('four built-in presets with the spec’s looks', () => {
   assert.deepEqual(preset('minimal'), { ...DEFAULT_STYLE, backgroundOpacity: 0, charEdgeStyle: edge('Drop Shadow') });
   assert.deepEqual(preset('large-print'), { ...DEFAULT_STYLE, sizePercent: 150, charEdgeStyle: edge('Outline') });
 });
+
+test('previewCss turns a style into CSS for the popup preview', () => {
+  const { previewCss } = require('../../lib/caption-style.js');
+  const css = previewCss(preset('high-contrast'));
+  assert.equal(css.color, 'rgba(255, 255, 0, 1)');
+  assert.equal(css.backgroundColor, 'rgba(8, 8, 8, 1)');
+  assert.equal(css.fontSize, '11px');
+  assert.equal(previewCss({ ...DEFAULT_STYLE, sizePercent: 200 }).fontSize, '22px');
+  assert.equal(previewCss(DEFAULT_STYLE).backgroundColor, 'rgba(8, 8, 8, 0.75)');
+  assert.equal(previewCss(DEFAULT_STYLE).textShadow, 'none');
+  assert.notEqual(previewCss(preset('minimal')).textShadow, 'none');
+  assert.equal(new Set(FONT_FAMILIES.map((f) => previewCss({ ...DEFAULT_STYLE, fontFamily: f.value }).fontFamily)).size, 7);
+});
