@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false, closedRows: [] };
+const BB = globalThis.BrowserBuddy;
+const state = { settings: BB.settings.normalizeSettings({}), scopeAll: false, tabs: [], groups: [], undoTabs: [], undoTimer: null, justClosed: false, closedRows: [] };
 const UNDO_MS = 8000;
 const FOLD_MS = 180;
 
@@ -9,7 +10,7 @@ async function init() {
   bindNavigation();
   bindYoutubeControls();
   bindTabControls();
-  await Promise.all([loadYoutubeState(), loadAmazonCartState()]);
+  await Promise.all([loadYoutubeState(), loadVideoSettings(), loadAmazonCartState()]);
 }
 
 function bindNavigation() {
@@ -19,6 +20,7 @@ function bindNavigation() {
     button.classList.add('is-active');
     $(`#${button.dataset.panel}`).classList.add('is-active');
     showTabsHome();
+    showYoutubeScreen('youtubeHome');
   }));
 }
 
@@ -30,6 +32,10 @@ function bindYoutubeControls() {
   document.querySelectorAll('.presets button').forEach((button) => button.addEventListener('click', () => updateSpeed(Number(button.dataset.speed))));
   $('#tutorialMode').addEventListener('change', saveTutorialPreference);
   $('#subscriptionCleanMode').addEventListener('change', saveSubscriptionPreference);
+  [['#qualityRow', 'qualityScreen'], ['#audioRow', 'audioScreen'], ['#captionsRow', 'captionsScreen']].forEach(([row, screen]) =>
+    $(row).addEventListener('click', () => showYoutubeScreen(screen)));
+  document.querySelectorAll('.back-to-youtube').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('youtubeHome')));
+  document.querySelectorAll('.back-to-captions').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('captionsScreen')));
 }
 
 async function loadYoutubeState() {
@@ -42,6 +48,44 @@ async function loadYoutubeState() {
   updateSpeedUI(stored.playbackSpeed || 1);
   tutorial.checked = !!stored.tutorialMode;
   clean.checked = !!stored.subscriptionCleanMode;
+}
+
+// Resolution, audio and captions. Every control writes chrome.storage.local at once, and
+// everything shown comes from normalizeSettings so the popup matches what the page applies.
+async function loadVideoSettings() {
+  state.settings = BB.settings.normalizeSettings(await chrome.storage.local.get(BB.settings.SETTING_KEYS));
+  renderVideoSettings();
+}
+async function saveSettings(patch) {
+  state.settings = BB.settings.normalizeSettings({ ...state.settings, ...patch });
+  renderVideoSettings();
+  await chrome.storage.local.set(patch);
+}
+function renderVideoSettings() {
+  renderYoutubeSummary(state.settings);
+}
+const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
+const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
+function languageName(code) { try { return languageNames.of(code) || code; } catch (_) { return code; } }
+function qualityText(quality) { return quality === 'auto' ? 'Auto' : quality === 'highest' ? 'Highest' : `${quality}p`; }
+function presetName(settings) {
+  if (settings.captionPresetId === null) return 'Custom';
+  return BB.presets.listPresets(settings).find((preset) => preset.id === settings.captionPresetId)?.name || 'Custom';
+}
+function renderYoutubeSummary(settings) {
+  $('#qualityRow .row-value').textContent = qualityText(settings.quality);
+  $('#audioRow .row-value').textContent = settings.audioTrackEnabled ? settings.myLanguages.map(languageName).join(' → ') : 'Off';
+  $('#captionsRow .row-value').textContent = `${settings.captionStyleEnabled ? presetName(settings) : 'Style off'} · ${CAPTION_MODE_TEXT[settings.captionsMode]}`;
+}
+// One YouTube screen at a time: the home view or one sub-screen. Going back focuses the row
+// that opened the screen, so keyboard users land where they left.
+function showYoutubeScreen(id) {
+  const from = document.querySelector('#youtubeHome:not([hidden]), .yt-screen:not([hidden])')?.id;
+  document.querySelectorAll('#youtubeHome, .yt-screen').forEach((screen) => { screen.hidden = screen.id !== id; });
+  if (from === id) return;
+  const rowFor = { qualityScreen: '#qualityRow', audioScreen: '#audioRow', captionsScreen: '#captionsRow' };
+  if (id === 'youtubeHome' && rowFor[from]) $(rowFor[from]).focus();
+  else if (id !== 'youtubeHome') $(`#${id} .back-link`).focus();
 }
 
 function updateSpeed(speed) {
