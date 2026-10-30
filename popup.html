@@ -30,6 +30,7 @@
             <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Playback speed</b></p>
             <span id="speedDelta" class="chip">normal</span>
           </div>
+          <div class="note-slot" data-slot="speed"></div>
           <div class="speed-body">
             <div class="stats">
               <div class="speed-readout"><p class="label">Speed</p><p class="speed-value"><span id="speedValue">1.00</span>×</p></div>
@@ -48,9 +49,9 @@
         </article>
 
         <article class="panel" aria-label="Video defaults">
-          <button id="qualityRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Resolution</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
-          <button id="audioRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Audio</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
-          <button id="captionsRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Captions</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span></button>
+          <button id="qualityRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Resolution</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span><span class="row-notes"></span></button>
+          <button id="audioRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Audio</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span><span class="row-notes"></span></button>
+          <button id="captionsRow" class="summary-row" type="button"><span class="summary-line"><span class="row-label">Captions</span><span class="row-value"></span><span class="chevron" aria-hidden="true">›</span></span><span class="row-notes"></span></button>
         </article>
 
         <article class="panel">
@@ -72,6 +73,7 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Resolution</b></p>
               <span id="qualityChip" class="chip"></span>
             </div>
+            <div class="note-slot" data-slot="quality"></div>
             <div class="screen-body">
               <p class="screen-intro">Every video starts at this resolution. If a video doesn’t have it, the next lower one plays.</p>
               <div id="qualityOptions" class="choice-list" role="radiogroup" aria-label="Resolution"></div>
@@ -89,6 +91,7 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Audio</b></p>
               <span id="audioChip" class="chip"></span>
             </div>
+            <div class="note-slot" data-slot="audio"></div>
             <div class="setting-row screen-rule">
               <div class="row-text"><h2 id="audioTrackTitle">Choose audio track</h2><p id="audioTrackDescription">Off lets YouTube pick, as before.</p></div>
               <label class="toggle"><input id="audioTrackEnabled" type="checkbox" aria-labelledby="audioTrackTitle" aria-describedby="audioTrackDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
@@ -108,6 +111,7 @@
               <p class="crumb"><span>YouTube</span><span class="crumb-sep">/</span><b>Captions</b></p>
               <span id="captionsChip" class="chip"></span>
             </div>
+            <div class="note-slot" data-slot="captions"></div>
             <div id="savePresetPrompt" class="screen-section" hidden>
               <p class="prompt-title">Save the player’s look as a preset?</p>
               <div class="video-swatch is-short" role="img" aria-label="Caption look set in the player"><span id="touchedWindow" class="caption-window"><span id="touchedPreview" class="caption-cue">Captions set in the player</span></span><span class="video-progress" aria-hidden="true"></span></div>

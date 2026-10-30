@@ -193,6 +193,24 @@ body.is-tool-open #tabs { flex:1; min-height:0; }
 .editing-note { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 14px; border-top:1px solid var(--line); background:var(--kept); font-size:10px; }
 .editing-note b { font-weight:500; }
 
+/* On the YouTube views each block under a panel head draws its own top rule, so notes can slot in between. */
+#youtube .panel-head { border-bottom:0; }
+#youtube .speed-body { border-top:1px solid var(--line); }
+/* This-video notes: touch (blue band with the way back), automatic and unavailable (quiet grey) */
+.note-slot:empty, .row-notes:empty { display:none; }
+.touch-note { display:flex; gap:8px; padding:8px 14px; border-top:1px solid var(--touch-line); background:var(--touch-bg); }
+.touch-note .note-dot, .row-note .note-dot { flex:none; width:6px; height:6px; margin-top:4px; background:var(--touch); }
+.touch-note div { display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+.touch-note p { color:var(--touch); font-size:10px; line-height:14px; }
+.use-bb-setting { padding:0; border:0; background:transparent; font-size:10px; font-weight:500; text-decoration:underline; text-underline-offset:3px; }
+.video-strip { display:flex; flex-direction:column; gap:6px; padding:10px 14px; border-top:1px solid var(--line); background:var(--kept); }
+.auto-note, .unavailable-note { display:flex; gap:6px; color:var(--muted); font-size:10px; line-height:14px; }
+.auto-note::before { content:"↓"; color:var(--faint); }
+.unavailable-note::before { content:""; flex:none; width:6px; height:6px; margin:4px 2px 0 0; border:1px solid var(--faint); }
+.row-notes { display:flex; flex-direction:column; gap:4px; }
+.row-note { display:flex; align-items:flex-start; gap:6px; color:var(--touch); font-size:10px; line-height:14px; }
+.row-note .note-dot { margin-top:4px; }
+
 /* Warnings */
 .warning { display:flex; gap:8px; padding:9px 14px; border-top:1px solid var(--warn-line); background:var(--warn-bg); }
 .warning-dot { flex:none; width:6px; height:6px; margin-top:3px; background:var(--warn); }
