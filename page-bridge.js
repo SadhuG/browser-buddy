@@ -26,10 +26,16 @@
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (event.source !== window || !data || data.source !== SOURCE || data.to !== 'page') return;
-    if (data.type === 'settings') { settings = data.settings; lastStatusJson = ''; tick(); }
+    if (data.type === 'settings') {
+      // A new style in the popup replaces a touched style everywhere: YouTube can't show two.
+      const styleOf = (s) => JSON.stringify([s.captionStyle, s.captionStyleEnabled]);
+      if (settings && styleOf(settings) !== styleOf(data.settings)) endStyleTouch();
+      settings = data.settings; lastStatusJson = ''; tick();
+    }
     if (data.type === 'clear-touch') {
       const state = stateFor(visiblePlayer());
-      if (state) state.tracker.clear(data.setting);
+      if (data.setting === 'captionStyle') endStyleTouch();
+      else if (state) state.tracker.clear(data.setting);
       lastInput = -Infinity; // the popup's choice is newer than any click in the player
       tick();
     }
@@ -59,17 +65,56 @@
   }
   function safe(fn) { try { return fn(); } catch (_) { return null; } }
 
+  // YouTube keeps one caption style for every tab (localStorage, pushed to other tabs' players
+  // through the "storage" event; measured 2026-10-30). So a style touch is shared: the tab that
+  // owns it keeps a note in localStorage, refreshed every tick, and every tab leaves the style
+  // alone while the note is live. It ends when the owner's video ends or its tab closes, or when
+  // the user picks a style in the popup or taps "Use Browser Buddy setting" in any tab.
+  const STYLE_TOUCH_KEY = 'browser-buddy-caption-style-touch';
+  const STYLE_TOUCH_STALE_MS = 5 * 60 * 1000; // an owner tab that crashed or was discarded
+  const tabToken = Math.random().toString(36).slice(2);
+  let otherTabStyleAt = -Infinity;
+  window.addEventListener('storage', (event) => { if (event.key === 'yt-player-caption-display-settings') otherTabStyleAt = performance.now(); });
+  function sharedStyleTouch() {
+    const note = safe(() => JSON.parse(localStorage.getItem(STYLE_TOUCH_KEY)));
+    return note && note.style && Date.now() - note.at < STYLE_TOUCH_STALE_MS ? note : null;
+  }
+  function writeStyleTouch(style) { safe(() => localStorage.setItem(STYLE_TOUCH_KEY, JSON.stringify({ owner: tabToken, style, at: Date.now() }))); }
+  function dropOwnStyleTouch() { if (sharedStyleTouch()?.owner === tabToken) safe(() => localStorage.removeItem(STYLE_TOUCH_KEY)); }
+  function endStyleTouch() {
+    safe(() => localStorage.removeItem(STYLE_TOUCH_KEY));
+    const state = stateFor(visiblePlayer());
+    if (state) { state.tracker.clear('captionStyle'); state.ownsStyleTouch = false; }
+  }
+  window.addEventListener('pagehide', dropOwnStyleTouch);
+
+  // A new viewing ends every touch and forgets what was applied: another video, another player
+  // (watch page vs Shorts), or coming back after the video wasn't shown for AWAY_TICKS ticks
+  // (Home, search). The miniplayer still shows the video, so it doesn't count as leaving.
+  // `viewing` counts them; content.js keys the speed touch on it.
+  const AWAY_TICKS = 2;
+  let viewing = 0;
+  let lastPlayer = null;
+  function newViewing(state, videoId) {
+    if (state.ownsStyleTouch) dropOwnStyleTouch();
+    state.videoId = videoId; state.video = {}; state.tracker.reset(); state.ownsStyleTouch = false;
+    // The click that opened it (a related video, autoplay's "Play now") isn't a choice about it.
+    lastInput = -Infinity;
+    viewing++;
+  }
+
   function tick() {
-    const status = { videoId: null, surface: null, touched: {}, auto: {}, unavailable: {} };
+    const status = { videoId: null, surface: null, viewing, touched: {}, auto: {}, unavailable: {} };
     const player = visiblePlayer();
     const state = stateFor(player);
     if (player) {
       const videoId = safe(() => player.getVideoData().video_id) || null;
-      // A new video ends every touch and forgets what was applied to the last one.
-      // The click that opened it (a related video, autoplay's "Play now") isn't a choice about it.
-      if (state.videoId !== videoId) { state.videoId = videoId; state.video = {}; state.tracker.reset(); lastInput = -Infinity; }
-      status.videoId = videoId;
       status.surface = surface();
+      const cameBack = status.surface && state.away >= AWAY_TICKS;
+      state.away = status.surface ? 0 : (state.away || 0) + 1;
+      if (state.videoId !== videoId || player !== lastPlayer || cameBack) newViewing(state, videoId);
+      status.videoId = videoId;
+      status.viewing = viewing;
       const ad = player.classList.contains('ad-showing');
       // Likewise "Skip ad": YouTube settling its captions or audio after the ad isn't the user's.
       if (state.ad && !ad) lastInput = -Infinity;
@@ -80,8 +125,10 @@
           try { applier.apply(player, ctx); } catch (_) { /* YouTube changed or is mid-load; retry next tick */ }
         }
       }
+      if (state.ownsStyleTouch) writeStyleTouch(state.tracker.touches().captionStyle);
       status.touched = { ...state.tracker.touches(), ...status.touched };
     }
+    lastPlayer = player;
     const json = JSON.stringify(status);
     if (json !== lastStatusJson) { lastStatusJson = json; post('status', { status }); }
   }
@@ -211,13 +258,30 @@
       if (status.surface === 'miniplayer' || !settings.captionStyleEnabled) return;
       const raw = player.getSubtitlesUserSettings();
       if (!raw) return;
-      const result = tracker.observe('captionStyle', BB.captionStyle.fromYoutubeSettings(raw), now, { userInitiated });
-      if (tracker.isTouched('captionStyle')) return;
+      const current = BB.captionStyle.fromYoutubeSettings(raw);
+      const shared = sharedStyleTouch();
+      // The touch this tab owned ended somewhere else (another tab's popup note, a newer touch).
+      if (state.ownsStyleTouch && shared?.owner !== tabToken) { state.ownsStyleTouch = false; tracker.clear('captionStyle'); }
+      if (shared && shared.owner !== tabToken) {
+        // Another tab's touch: follow it. A pick in this tab's own menu takes the touch over.
+        if (tracker.observe('captionStyle', current, now, { userInitiated }) === 'touched') { state.ownsStyleTouch = true; return; }
+        tracker.applied('captionStyle', shared.style, now);
+        status.touched.captionStyle = shared.style;
+        state.video.style = null; // re-apply Browser Buddy's style once the touch ends
+        return;
+      }
+      const result = tracker.observe('captionStyle', current, now, { userInitiated });
+      if (tracker.isTouched('captionStyle')) { state.ownsStyleTouch = true; return; }
+      // Another tab just changed YouTube's shared style: wait for its touch note before correcting.
+      if (result === 'drift' && performance.now() - otherTabStyleAt < 3000) return;
       const wanted = settings.captionStyle;
       if (!state.video.style || result === 'drift' || !BB.captionStyle.stylesEqual(state.video.style, wanted)) {
-        player.updateSubtitlesUserSettings(BB.captionStyle.toYoutubeSettings(wanted));
-        // Captions already on screen only pick up the new style after an off/on (findings Q6).
-        if (player.isSubtitlesOn()) { player.toggleSubtitles(); player.toggleSubtitles(); }
+        // Skip a style YouTube already has: re-applying it blinks the captions for nothing.
+        if (!BB.captionStyle.stylesEqual(current, wanted)) {
+          player.updateSubtitlesUserSettings(BB.captionStyle.toYoutubeSettings(wanted));
+          // Captions already on screen only pick up the new style after an off/on (findings Q6).
+          if (player.isSubtitlesOn()) { player.toggleSubtitles(); player.toggleSubtitles(); }
+        }
         tracker.applied('captionStyle', wanted, now);
         state.video.style = wanted;
       }

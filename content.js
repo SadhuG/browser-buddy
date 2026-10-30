@@ -83,10 +83,11 @@ document.addEventListener('ratechange', (event) => {
   const result = speedTracker.observe('speed', event.target.playbackRate, Date.now(), { userInitiated: userJustActed() });
   if (result === 'drift') applySettings();
 }, true);
-// Watch pages and Shorts both count as "a video" for ending a touch. On YouTube the bridge's
-// video id wins: the miniplayer moves the page to "/" while the same video keeps playing.
+// Watch pages and Shorts both count as "a video" for ending a touch. On YouTube the bridge decides
+// (video id plus its viewing count): the miniplayer moves the page to "/" while the same video
+// keeps playing, and coming back to a video after leaving it is a new viewing.
 function videoKey(value) { try { const url = new URL(value); return url.searchParams.get('v') || (url.pathname.match(/^\/shorts\/([^/]+)/) || [])[1] || null; } catch (_) { return null; } }
-const currentVideoKey = () => (bridgeStatus ? bridgeStatus.videoId : videoKey(location.href));
+const currentVideoKey = () => (bridgeStatus ? `${bridgeStatus.videoId}#${bridgeStatus.viewing}` : videoKey(location.href));
 let lastVideoKey = videoKey(location.href);
 // The click that opened the next video isn't a choice about that video's speed.
 function noteNavigation() { const key = currentVideoKey(); if (key !== lastVideoKey) { lastVideoKey = key; lastUserInput = -Infinity; speedTracker.reset(); } }

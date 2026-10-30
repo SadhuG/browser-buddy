@@ -1,4 +1,4 @@
-const { test, expect, openStubVideo, tabStatus, setSetting } = require('./fixtures');
+const { test, expect, openStubVideo, tabStatus, setSetting, clearTouch } = require('./fixtures');
 const { BUILT_IN_PRESETS, toYoutubeSettings } = require('../../lib/caption-style.js');
 
 const style = (id) => BUILT_IN_PRESETS.find((p) => p.id === id).style;
@@ -41,18 +41,68 @@ test('a style changed in the player holds and is reported', async ({ context, po
   await expect.poll(async () => (await status(popup, page)).touched?.captionStyle?.color).toBe('#0f0');
 });
 
-test('a popup style change reaches untouched tabs only', async ({ context, popup }) => {
-  const touchedTab = await open(context, popup, true, 'high-contrast', 'stubA');
-  const otherTab = await openStubVideo(context, { id: 'stubB', config });
-  await expect.poll(async () => (await youtubeStyle(otherTab)).color).toBe('#ff0');
-  await touchedTab.bringToFront();
-  await expect.poll(async () => (await youtubeStyle(touchedTab)).color).toBe('#ff0');
-  await touchedTab.click('#movie_player');
-  await touchedTab.evaluate(() => window.__bbStub.userSetStyle({ color: '#0f0' }));
-  await expect.poll(async () => (await status(popup, touchedTab)).touched?.captionStyle?.color).toBe('#0f0');
+// YouTube keeps one caption style for every tab (the stub models this), so a style picked in
+// YouTube's menu is shared: every tab shows it until the touched video ends.
+async function touchGreen(popup, page) {
+  await page.bringToFront();
+  await page.click('#movie_player');
+  await page.evaluate(() => window.__bbStub.userSetStyle({ color: '#0f0' }));
+  await expect.poll(async () => (await status(popup, page)).touched?.captionStyle?.color).toBe('#0f0');
+}
+async function touchedThenSecondTab(context, popup) {
+  const tabA = await open(context, popup, true, 'high-contrast', 'stubA');
+  await expect.poll(async () => (await youtubeStyle(tabA)).color).toBe('#ff0');
+  await touchGreen(popup, tabA);
+  const tabB = await openStubVideo(context, { id: 'stubB', config });
+  await tabB.waitForTimeout(3000);
+  return { tabA, tabB };
+}
+
+test('a style touched in one tab holds in every tab when another tab starts a video', async ({ context, popup }) => {
+  const { tabA, tabB } = await touchedThenSecondTab(context, popup);
+  expect((await youtubeStyle(tabA)).color).toBe('#0f0');
+  expect((await youtubeStyle(tabB)).color).toBe('#0f0');
+  expect((await status(popup, tabB)).touched?.captionStyle?.color).toBe('#0f0');
+});
+
+test('the shared style touch ends when its video ends', async ({ context, popup }) => {
+  const { tabA, tabB } = await touchedThenSecondTab(context, popup);
+  await tabA.evaluate(() => window.__bbStub.loadVideo('stub2'));
+  await expect.poll(async () => (await youtubeStyle(tabA)).color).toBe('#ff0');
+  await expect.poll(async () => (await youtubeStyle(tabB)).color).toBe('#ff0');
+  await expect.poll(async () => (await status(popup, tabB)).touched?.captionStyle).toBeUndefined();
+});
+
+test('Use Browser Buddy setting in another tab ends the shared style touch', async ({ context, popup }) => {
+  const { tabA, tabB } = await touchedThenSecondTab(context, popup);
+  await clearTouch(popup, 'captionStyle', tabB);
+  await expect.poll(async () => (await youtubeStyle(tabB)).color).toBe('#ff0');
+  await expect.poll(async () => (await youtubeStyle(tabA)).color).toBe('#ff0');
+  await expect.poll(async () => (await status(popup, tabA)).touched?.captionStyle).toBeUndefined();
+});
+
+// The newest deliberate choice wins: YouTube can't show two styles at once, so a popup style
+// change replaces a touched style everywhere instead of skipping the touched video.
+test('a popup style change replaces a touched style in every tab', async ({ context, popup }) => {
+  const { tabA, tabB } = await touchedThenSecondTab(context, popup);
   await setSetting(popup, 'captionStyle', style('large-print'));
-  await expect.poll(async () => (await youtubeStyle(otherTab)).fontSizeIncrement).toBe(1);
-  expect((await youtubeStyle(touchedTab)).color).toBe('#0f0');
+  await expect.poll(async () => (await youtubeStyle(tabA)).fontSizeIncrement).toBe(1);
+  await expect.poll(async () => (await youtubeStyle(tabB)).fontSizeIncrement).toBe(1);
+  await expect.poll(async () => (await status(popup, tabA)).touched?.captionStyle).toBeUndefined();
+});
+
+// Re-applying a style YouTube already has would blink captions off and on for nothing.
+test('leaves a style YouTube already has alone, without blinking captions', async ({ context, popup }) => {
+  await popup.evaluate((s) => chrome.storage.local.set({ captionStyleEnabled: true, captionStyle: s }), style('high-contrast'));
+  const page = await openStubVideo(context, { config: { ...config, style: toYoutubeSettings(style('high-contrast')) } });
+  const toggles = () => page.evaluate(() => window.__bbStub.callsTo('toggleSubtitles'));
+  await page.waitForTimeout(2000);
+  expect(await updates(page)).toEqual([]);
+  expect(await toggles()).toEqual([]);
+  await page.evaluate(() => window.__bbStub.loadVideo('stub2'));
+  await page.waitForTimeout(1500);
+  expect(await updates(page)).toEqual([]);
+  expect(await toggles()).toEqual([]);
 });
 
 test('waits out an ad without errors', async ({ context, popup }) => {

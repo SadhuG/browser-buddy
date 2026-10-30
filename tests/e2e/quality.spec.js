@@ -141,3 +141,35 @@ test('switching to auto skips the touched video', async ({ context, popup }) => 
   expect((await rangeCalls(page)).filter((call) => call[1] === 'auto')).toEqual([]);
   expect(await current(page)).toBe('large');
 });
+
+// The repeat-pick rule needs input: YouTube moving to the remembered menu quality on its own
+// on the next video is drift and gets corrected.
+test('on the next video, YouTube moving to the remembered pick by itself is corrected', async ({ context, popup }) => {
+  const page = await open(context, popup, '1080');
+  await expect.poll(() => current(page)).toBe('hd1080');
+  await page.click('#movie_player');
+  await page.evaluate(() => window.__bbStub.userSetQuality('large'));
+  await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
+  await page.evaluate(() => window.__bbStub.loadVideo('stub2'));
+  await expect.poll(() => current(page)).toBe('hd1080');
+  await page.evaluate(() => window.__bbStub.driftQuality('large'));
+  await expect.poll(() => current(page), { timeout: 6000 }).toBe('hd1080');
+  expect((await status(popup, page)).touched?.quality).toBeUndefined();
+});
+
+// Leaving a video (Home, a Short) and coming back to it later is a new viewing: the touch ends.
+// The miniplayer isn't leaving (see 'miniplayer steps down and back').
+for (const [where, away] of [['Home', '/'], ['a Short', '/shorts/abc']]) {
+  test(`coming back to a video from ${where} starts fresh`, async ({ context, popup }) => {
+    const page = await open(context, popup, '1080');
+    await expect.poll(() => current(page)).toBe('hd1080');
+    await page.click('#movie_player');
+    await page.evaluate(() => window.__bbStub.userSetQuality('large'));
+    await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
+    await page.evaluate((path) => history.pushState({}, '', path), away);
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => history.pushState({}, '', '/watch?v=stub1'));
+    await expect.poll(() => current(page)).toBe('hd1080');
+    expect((await status(popup, page)).touched?.quality).toBeUndefined();
+  });
+}

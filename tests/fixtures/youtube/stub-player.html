@@ -65,14 +65,23 @@
   };
 
   // Caption style (findings Q6). Like the real player, it reads null and refuses updates during an ad.
-  let captionStyle = { background: '#080808', backgroundOpacity: 0.75, charEdgeStyle: 0, color: '#fff', fontFamily: 4, fontSizeIncrement: 0, fontStyle: 0, textOpacity: 1, windowColor: '#080808', windowOpacity: 0, ...(config.style || {}) };
+  // Like YouTube (measured 2026-10-30), one style is shared by every tab through localStorage:
+  // a change in one tab reaches the other tabs' players through the "storage" event.
+  const STYLE_KEY = 'yt-player-caption-display-settings';
+  const defaultStyle = { background: '#080808', backgroundOpacity: 0.75, charEdgeStyle: 0, color: '#fff', fontFamily: 4, fontSizeIncrement: 0, fontStyle: 0, textOpacity: 1, windowColor: '#080808', windowOpacity: 0 };
+  const readStoredStyle = () => { try { return JSON.parse(JSON.parse(localStorage.getItem(STYLE_KEY)).data); } catch (_) { return null; } };
+  let captionStyle = { ...defaultStyle, ...(config.style || readStoredStyle() || {}) };
+  const storeStyle = () => localStorage.setItem(STYLE_KEY, JSON.stringify({ data: JSON.stringify(captionStyle), creation: Date.now(), expiration: Date.now() + 30 * 864e5 }));
+  window.addEventListener('storage', (event) => { if (event.key === STYLE_KEY) captionStyle = { ...defaultStyle, ...(readStoredStyle() || {}) }; });
   const inAd = () => player.classList.contains('ad-showing');
   define('getSubtitlesUserSettings', () => (inAd() ? null : { ...captionStyle }));
   define('updateSubtitlesUserSettings', (partial) => {
     if (inAd()) throw new TypeError("Cannot read properties of undefined (reading 'daa')");
     captionStyle = { ...captionStyle, ...partial };
+    storeStyle();
   });
-  stub.userSetStyle = (partial) => { captionStyle = { ...captionStyle, ...partial }; };
+  stub.userSetStyle = (partial) => { captionStyle = { ...captionStyle, ...partial }; storeStyle(); };
+  // Drift in this tab only, like YouTube's own reset when the stored style expires.
   stub.driftStyle = (full) => { captionStyle = { ...full }; };
 
   // Audio tracks (findings Q4): a single-track video lists []; setAudioTrack takes the raw
