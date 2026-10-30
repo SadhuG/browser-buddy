@@ -71,3 +71,29 @@ test('miniplayer is skipped', async ({ context, popup }) => {
   await page.waitForTimeout(2000);
   expect(await captionCalls(page)).toEqual([]);
 });
+
+// Clicking a related video or "Skip ad" is input, but YouTube settling its own captions
+// right after is not the user's choice. The bridge's tick is called directly to pin the timing.
+const tick = (page) => page.evaluate(() => window.BrowserBuddy.bridge.tick());
+
+test('a click that starts the next video does not count as a touch', async ({ context, popup }) => {
+  const page = await open(context, popup, 'on');
+  await expect.poll(() => isOn(page)).toBe(true);
+  await page.click('#movie_player');
+  await page.evaluate(() => { window.__bbStub.loadVideo('stub2'); window.BrowserBuddy.bridge.tick(); window.__bbStub.userSetCaptions(false); });
+  await tick(page);
+  expect((await status(popup, page)).touched?.captions).toBeUndefined();
+  await expect.poll(() => isOn(page), { timeout: 6000 }).toBe(true);
+});
+
+test('a click that skips an ad does not count as a touch', async ({ context, popup }) => {
+  const page = await open(context, popup, 'on');
+  await expect.poll(() => isOn(page)).toBe(true);
+  await page.evaluate(() => window.__bbStub.startAd());
+  await tick(page);
+  await page.click('#movie_player');
+  await page.evaluate(() => { window.__bbStub.endAd(); window.BrowserBuddy.bridge.tick(); window.__bbStub.userSetCaptions(false); });
+  await tick(page);
+  expect((await status(popup, page)).touched?.captions).toBeUndefined();
+  await expect.poll(() => isOn(page), { timeout: 6000 }).toBe(true);
+});

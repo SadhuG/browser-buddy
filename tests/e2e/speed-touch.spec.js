@@ -59,3 +59,24 @@ test('CLEAR_TOUCH restores the Browser Buddy speed', async ({ context, popup }) 
   await clearTouch(popup, 'speed', page);
   await expect.poll(() => rate(page)).toBe(1.25);
 });
+
+// YouTube's speed menu and shortcut redraw part of the page in the same step as the rate change.
+test('a player speed change that also updates the page holds', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  await page.click('video');
+  await page.evaluate(() => { document.querySelector('video').playbackRate = 1.5; document.body.append(document.createElement('div')); });
+  await page.waitForTimeout(2500);
+  expect(await rate(page)).toBe(1.5);
+  await expect.poll(async () => (await tabStatus(popup, page)).touched.speed).toBe(1.5);
+});
+
+// The miniplayer moves the page to "/" while the same video keeps playing.
+test('the speed touch holds in the miniplayer', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  await userSetRate(page, 1.5);
+  await expect.poll(async () => (await tabStatus(popup, page)).touched.speed).toBe(1.5);
+  await page.evaluate(() => { window.__bbStub.setMiniplayer(true); history.pushState({}, '', '/'); });
+  await page.waitForTimeout(2500);
+  expect(await rate(page)).toBe(1.5);
+  expect((await tabStatus(popup, page)).touched.speed).toBe(1.5);
+});
