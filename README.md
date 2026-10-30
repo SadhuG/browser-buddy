@@ -12,10 +12,14 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a monospac
 
 ### YouTube
 
+The YouTube tab shows playback speed, one summary row each for Resolution, Audio and Captions, and the Tutorial mode and Subscription clean switches. Each row shows its current setting; select it to open its screen, and **← YouTube** to come back.
+
 - Playback speed from 0.25× to 4×, with quick presets. A speed you pick in YouTube's own player holds for that video; the next video uses Browser Buddy's speed again.
-- Preferred resolution for every video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer and on low battery, Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video.
-- Captions: always on, always off, or YouTube's choice, in your languages (English and Hindi by default; auto-translated when a video has neither). Your caption style, built only from YouTube's own options, is applied on every video and restored if YouTube resets it. Four built-in looks: Classic, High contrast, Minimal and Large print. Captions you switch off or restyle in YouTube's own player stay that way for that video.
-- Audio track: originals in your languages (English and Hindi by default) play as-is. Other videos play your first available dub, preferring human dubs over AI dubs, or the original with captions in your language when there's no dub. A track you pick in YouTube's own menu holds for that video.
+- **Resolution** screen: a preferred resolution for every video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer (two steps lower) and on battery below 20% (one step lower), Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video.
+- **Captions** screen: always on, always off, or YouTube's choice, in your languages (English and Hindi by default; auto-translated when a video has neither). With **Style captions** on, your style, built only from YouTube's own options, is applied on every video and restored if YouTube resets it. A live preview shows it over a grey video frame. Pick one of four built-in looks (Classic, High contrast, Minimal, Large print), or set font, color, opacity, size, edge, background and window yourself; **Reset to Classic** goes back. Captions you switch off or restyle in YouTube's own player stay that way for that video.
+- **Presets** screen (from **Manage presets**): save the current style as your own preset, then rename, edit or delete it. Built-in looks can be edited too, and an edited one can be reset. When you've restyled captions in YouTube's player, the Captions screen offers to save that look as a preset.
+- **Audio** screen: with **Choose audio track** on, originals in your languages play as-is. Other videos play your first available dub, preferring human dubs over AI dubs, or the original with captions in your language when there's no dub. **My languages** (English and Hindi by default) is a ranked list you can add to, reorder with the up and down buttons, and trim; it also picks caption languages. A track you pick in YouTube's own menu holds for that video.
+- Notes about the video in the active tab: when you changed a setting in YouTube's player, a blue note says so ("This video: 1.5× set in player") with **Use Browser Buddy setting** to switch back. Grey notes tell you when Browser Buddy lowered the resolution on its own ("720p on battery") or when a video can't follow a setting ("This video tops out at 1080p", "No other audio tracks on this video").
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
 - Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf. Shorts shelves are recognized by page structure in any language; other shelves and videos are left alone.
 - Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
@@ -59,9 +63,15 @@ Reload the extension on that page after changing source files. Refresh any alrea
 | `popup.css` | Popup interface, light and dark theme colors, and UI states. |
 | `theme.js` | Applies the saved or system theme before the popup paints, and handles the theme switch. |
 | `fonts/` | Bundled Azeret Mono variable font used by the popup, with its OFL license. |
-| `popup.js` | Popup controls, tab discovery, confirmation, and Undo. |
+| `popup.js` | Popup controls: speed, the Resolution, Audio, Captions and Presets screens, per-video notes, tab discovery, confirmation, and Undo. |
 | `lib/duplicate-tabs.js` | Duplicate-tab URL normalization and grouping, shared by the popup and the unit tests. |
 | `lib/settings.js` | Setting defaults and validation, shared by the content scripts, popup and unit tests. |
+| `lib/quality.js` | Picks the resolution to play from your choice, what the video offers, the miniplayer and the battery. |
+| `lib/languages.js` | Matches languages by base language, so every English variant counts as English. |
+| `lib/caption-style.js` | YouTube's caption style values, the built-in presets, and the CSS for the popup's caption preview. |
+| `lib/caption-track.js` | Chooses the caption track from My languages. |
+| `lib/audio-track.js` | Reads YouTube's audio tracks and chooses one from My languages. |
+| `lib/presets.js` | Creates, renames, edits, deletes and resets caption presets. |
 | `lib/touch.js` | Tells Browser Buddy's own changes apart from changes you make in YouTube's player, so your change holds for that video. |
 | `background.js` | Detects tab/window focus changes and notifies YouTube pages. |
 | `content.js` | Applies YouTube controls and the Amazon cart-sidebar preference, and relays settings to `page-bridge.js`. |
