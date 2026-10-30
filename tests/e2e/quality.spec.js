@@ -112,3 +112,32 @@ test('switching back to auto releases the player', async ({ context, popup }) =>
   await page.waitForTimeout(1500);
   expect((await rangeCalls(page)).filter((call) => call[1] === 'auto')).toHaveLength(1);
 });
+
+// YouTube keeps the menu pick from video to video, so the same pick on the next video
+// doesn't change the stored preference.
+test('picking the same resolution again on the next video holds', async ({ context, popup }) => {
+  const page = await open(context, popup, '1080');
+  await expect.poll(() => current(page)).toBe('hd1080');
+  await page.click('#movie_player');
+  await page.evaluate(() => window.__bbStub.userSetQuality('large'));
+  await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
+  await page.evaluate(() => window.__bbStub.loadVideo('stub2'));
+  await expect.poll(() => current(page)).toBe('hd1080');
+  await page.click('#movie_player');
+  await page.evaluate(() => window.__bbStub.userSetQuality('large'));
+  await page.waitForTimeout(4000);
+  expect(await current(page)).toBe('large');
+  await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
+});
+
+test('switching to auto skips the touched video', async ({ context, popup }) => {
+  const page = await open(context, popup, '1080');
+  await expect.poll(() => current(page)).toBe('hd1080');
+  await page.click('#movie_player');
+  await page.evaluate(() => window.__bbStub.userSetQuality('large'));
+  await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
+  await setSetting(popup, 'quality', 'auto');
+  await page.waitForTimeout(2000);
+  expect((await rangeCalls(page)).filter((call) => call[1] === 'auto')).toEqual([]);
+  expect(await current(page)).toBe('large');
+});

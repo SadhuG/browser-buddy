@@ -48,7 +48,7 @@ if (isYoutubePage) {
     const data = event.data;
     if (event.source !== window || !data || data.source !== 'browser-buddy' || data.to !== 'extension') return;
     if (data.type === 'hello') sendSettingsToPage();
-    if (data.type === 'status') bridgeStatus = data.status;
+    if (data.type === 'status') { bridgeStatus = data.status; applySettings(); }
   });
 }
 function tabStatus() {
@@ -57,7 +57,8 @@ function tabStatus() {
   return { ...status, touched: { ...status.touched, ...speedTracker.touches() } };
 }
 function clearTouch(setting) {
-  if (setting === 'speed') { speedTracker.clear('speed'); applySettings(); return; }
+  // "Use Browser Buddy setting" is newer than any click in the player before it.
+  if (setting === 'speed') { speedTracker.clear('speed'); lastUserInput = -Infinity; applySettings(); return; }
   if (isYoutubePage) bridgeMessage('clear-touch', { setting });
 }
 document.addEventListener('visibilitychange', () => document.hidden ? pauseVideo() : resumeVideo());
@@ -74,23 +75,31 @@ function resumeVideo() { if (!isTutorialMode() || !wasAutoPaused) return; const 
 const speedTracker = BrowserBuddy.touch.createTouchTracker({ graceMs: 0, comparators: { speed: (a, b) => Math.abs(a - b) < .01 } });
 let lastUserInput = -Infinity;
 const markUserInput = (event) => { if (event.isTrusted) lastUserInput = performance.now(); };
+const userJustActed = () => performance.now() - lastUserInput < 2000;
 window.addEventListener('pointerdown', markUserInput, true);
 window.addEventListener('keydown', markUserInput, true);
 document.addEventListener('ratechange', (event) => {
   if (event.target !== videoElement()) return;
-  const result = speedTracker.observe('speed', event.target.playbackRate, Date.now(), { userInitiated: performance.now() - lastUserInput < 2000 });
+  const result = speedTracker.observe('speed', event.target.playbackRate, Date.now(), { userInitiated: userJustActed() });
   if (result === 'drift') applySettings();
 }, true);
-// Watch pages and Shorts both count as "a video" for ending a touch.
+// Watch pages and Shorts both count as "a video" for ending a touch. On YouTube the bridge's
+// video id wins: the miniplayer moves the page to "/" while the same video keeps playing.
 function videoKey(value) { try { const url = new URL(value); return url.searchParams.get('v') || (url.pathname.match(/^\/shorts\/([^/]+)/) || [])[1] || null; } catch (_) { return null; } }
+const currentVideoKey = () => (bridgeStatus ? bridgeStatus.videoId : videoKey(location.href));
 let lastVideoKey = videoKey(location.href);
-function noteNavigation() { const key = videoKey(location.href); if (key !== lastVideoKey) { lastVideoKey = key; speedTracker.reset(); } }
+// The click that opened the next video isn't a choice about that video's speed.
+function noteNavigation() { const key = currentVideoKey(); if (key !== lastVideoKey) { lastVideoKey = key; lastUserInput = -Infinity; speedTracker.reset(); } }
 
 function applySettings() {
   noteNavigation();
   const video = videoElement();
   if (!video || speedTracker.isTouched('speed')) return;
-  if (Math.abs(video.playbackRate - playbackSpeed) > .01) video.playbackRate = playbackSpeed;
+  if (Math.abs(video.playbackRate - playbackSpeed) > .01) {
+    // A rate the user just picked can be seen here before its ratechange event fires.
+    if (userJustActed() && speedTracker.observe('speed', video.playbackRate, Date.now(), { userInitiated: true }) === 'touched') return;
+    video.playbackRate = playbackSpeed;
+  }
   speedTracker.applied('speed', playbackSpeed, Date.now());
 }
 

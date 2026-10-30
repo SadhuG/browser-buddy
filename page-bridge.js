@@ -30,6 +30,7 @@
     if (data.type === 'clear-touch') {
       const state = stateFor(visiblePlayer());
       if (state) state.tracker.clear(data.setting);
+      lastInput = -Infinity; // the popup's choice is newer than any click in the player
       tick();
     }
   });
@@ -65,10 +66,14 @@
     if (player) {
       const videoId = safe(() => player.getVideoData().video_id) || null;
       // A new video ends every touch and forgets what was applied to the last one.
-      if (state.videoId !== videoId) { state.videoId = videoId; state.video = {}; state.tracker.reset(); }
+      // The click that opened it (a related video, autoplay's "Play now") isn't a choice about it.
+      if (state.videoId !== videoId) { state.videoId = videoId; state.video = {}; state.tracker.reset(); lastInput = -Infinity; }
       status.videoId = videoId;
       status.surface = surface();
       const ad = player.classList.contains('ad-showing');
+      // Likewise "Skip ad": YouTube settling its captions or audio after the ad isn't the user's.
+      if (state.ad && !ad) lastInput = -Infinity;
+      state.ad = ad;
       if (settings && videoId && status.surface && !ad) {
         const ctx = { settings, tracker: state.tracker, now: Date.now(), userInitiated: performance.now() - lastInput < INPUT_WINDOW_MS, status, state };
         for (const applier of appliers) {
@@ -91,10 +96,22 @@
     }
     return !!battery && !battery.charging && battery.level < 0.2;
   }
+  // A pick in YouTube's quality menu moves the user preference; Browser Buddy's range does not.
+  // YouTube keeps that preference across videos, so picking the same quality again on the next
+  // video leaves it unchanged: right after input, a playing quality equal to it counts too.
+  function observeQualityPick(player, tracker, now, state, userInitiated) {
+    const userPreference = typeof player.getUserPlaybackQualityPreference === 'function' ? player.getUserPlaybackQualityPreference() : 'auto';
+    const playing = player.getPlaybackQuality();
+    const changed = state.lastQualityPreference !== undefined && userPreference !== state.lastQualityPreference;
+    state.lastQualityPreference = userPreference;
+    const userPicked = changed || (userInitiated && userPreference !== 'auto' && userPreference === playing);
+    return tracker.observe('quality', playing, now, { userInitiated: userPicked });
+  }
   appliers.push({
     name: 'quality',
-    apply(player, { settings, tracker, now, status, state }) {
+    apply(player, { settings, tracker, now, status, state, userInitiated }) {
       const preference = settings.quality;
+      if (tracker.isTouched('quality')) { observeQualityPick(player, tracker, now, state, userInitiated); return; }
       if (preference === 'auto') {
         if (state.qualityManaged) { state.qualityManaged = false; player.setPlaybackQualityRange('auto', 'auto'); }
         return;
@@ -104,11 +121,7 @@
       if (pick.reason === 'miniplayer' || pick.reason === 'battery') status.auto.quality = { height: pick.height, reason: pick.reason };
       if (pick.maxHeight && /^\d+$/.test(preference) && Number(preference) > pick.maxHeight) status.unavailable.quality = { maxHeight: pick.maxHeight };
       if (!pick.quality) return;
-      // A pick in YouTube's quality menu moves the user preference; Browser Buddy's range does not.
-      const userPreference = typeof player.getUserPlaybackQualityPreference === 'function' ? player.getUserPlaybackQualityPreference() : 'auto';
-      const userPicked = state.lastQualityPreference !== undefined && userPreference !== state.lastQualityPreference;
-      state.lastQualityPreference = userPreference;
-      const result = tracker.observe('quality', player.getPlaybackQuality(), now, { userInitiated: userPicked });
+      const result = observeQualityPick(player, tracker, now, state, userInitiated);
       if (tracker.isTouched('quality')) return;
       if (pick.quality !== state.video.quality || result === 'drift') {
         player.setPlaybackQualityRange(pick.quality, pick.quality);
