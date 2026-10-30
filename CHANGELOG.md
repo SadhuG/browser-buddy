@@ -7,7 +7,7 @@ Release: 2026-10-30
 ### Added
 
 - Preferred resolution for every YouTube video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer and on low battery, Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video.
-- Captions always on, always off, or YouTube's choice, in your languages, auto-translated when needed. A caption style built from YouTube's own options is applied on every video and restored if YouTube resets it, with four built-in looks: Classic, High contrast, Minimal and Large print, and a live preview in the popup.
+- Captions always on, always off, or YouTube's choice, in your languages, auto-translated when needed. A caption style built from YouTube's own options is applied on every video and restored if YouTube resets it, with four built-in looks: Classic, High contrast, Minimal and Large print, and a live preview in the popup. Captions don't blink when a video already has your style. A style you pick in YouTube's player shows in every YouTube tab (YouTube shares one style) until that video ends.
 - Audio track choice: originals in your languages (English and Hindi by default) play as-is. Other videos play your first available dub, human before AI, or the original with captions in your language. My languages can be reordered with buttons, so it works from the keyboard.
 - Caption presets of your own: save the current style, rename, edit or delete it. Built-in looks can be edited and reset.
 - "Save as preset?": after you restyle captions in YouTube's player, the Captions screen offers to keep that look as a preset.

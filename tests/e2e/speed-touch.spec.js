@@ -80,3 +80,26 @@ test('the speed touch holds in the miniplayer', async ({ context, popup }) => {
   expect(await rate(page)).toBe(1.5);
   expect((await tabStatus(popup, page)).touched.speed).toBe(1.5);
 });
+
+// The click that opens the next video isn't a choice about that video's speed, so YouTube's
+// remembered speed arriving right after it is reverted, not kept as a touch.
+test('the click that opens the next video does not make its speed a touch', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  await page.click('video');
+  await page.evaluate(() => { window.__bbStub.loadVideo('stub2'); window.BrowserBuddy.bridge.tick(); });
+  await expect.poll(async () => (await tabStatus(popup, page)).videoId).toBe('stub2');
+  await setRate(page, 2);
+  await expect.poll(() => rate(page), { timeout: 2000 }).toBe(1.25);
+  expect((await tabStatus(popup, page)).touched.speed).toBeUndefined();
+});
+
+test('coming back to a video from Home ends the speed touch', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  await userSetRate(page, 1.5);
+  await expect.poll(async () => (await tabStatus(popup, page)).touched.speed).toBe(1.5);
+  await page.evaluate(() => history.pushState({}, '', '/'));
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => history.pushState({}, '', '/watch?v=stub1'));
+  await expect.poll(() => rate(page)).toBe(1.25);
+  expect((await tabStatus(popup, page)).touched.speed).toBeUndefined();
+});
