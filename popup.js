@@ -35,6 +35,7 @@ function bindYoutubeControls() {
   [['#qualityRow', 'qualityScreen'], ['#audioRow', 'audioScreen'], ['#captionsRow', 'captionsScreen']].forEach(([row, screen]) =>
     $(row).addEventListener('click', () => showYoutubeScreen(screen)));
   document.querySelectorAll('.back-to-youtube').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('youtubeHome')));
+  buildQualityOptions();
   document.querySelectorAll('.back-to-captions').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('captionsScreen')));
 }
 
@@ -63,6 +64,7 @@ async function saveSettings(patch) {
 }
 function renderVideoSettings() {
   renderYoutubeSummary(state.settings);
+  renderQualityScreen(state.settings);
 }
 const CAPTION_MODE_TEXT = { youtube: 'YouTube decides', on: 'always on', off: 'always off' };
 const languageNames = new Intl.DisplayNames(undefined, { type: 'language' });
@@ -77,6 +79,23 @@ function renderYoutubeSummary(settings) {
   $('#audioRow .row-value').textContent = settings.audioTrackEnabled ? settings.myLanguages.map(languageName).join(' → ') : 'Off';
   $('#captionsRow .row-value').textContent = `${settings.captionStyleEnabled ? presetName(settings) : 'Style off'} · ${CAPTION_MODE_TEXT[settings.captionsMode]}`;
 }
+const QUALITY_OPTIONS = [['auto', 'Auto', 'YouTube decides'], ['highest', 'Highest available', ''],
+  ...['2160', '1440', '1080', '720', '480', '360', '240', '144'].map((h) => [h, `${h}p`, h === '2160' ? '4K' : ''])];
+function buildQualityOptions() {
+  $('#qualityOptions').replaceChildren(...QUALITY_OPTIONS.map(([value, label, hint]) => {
+    const choice = element('label', 'choice');
+    const input = element('input'); input.type = 'radio'; input.name = 'quality'; input.value = value;
+    input.addEventListener('change', () => saveSettings({ quality: value }));
+    choice.append(input, element('span', 'choice-label', label));
+    if (hint) choice.append(element('span', 'choice-hint', hint));
+    return choice;
+  }));
+}
+function renderQualityScreen(settings) {
+  $('#qualityChip').textContent = qualityText(settings.quality);
+  document.querySelectorAll('input[name=quality]').forEach((input) => { input.checked = input.value === settings.quality; });
+}
+
 // One YouTube screen at a time: the home view or one sub-screen. Going back focuses the row
 // that opened the screen, so keyboard users land where they left.
 function showYoutubeScreen(id) {
