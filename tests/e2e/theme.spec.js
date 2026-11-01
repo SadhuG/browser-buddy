@@ -24,9 +24,11 @@ test('the toggle switches themes and the choice survives reopening', async ({ co
   await expect(popup.locator('[data-theme-choice="light"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(popup.locator('[data-theme-choice="dark"]')).toHaveAttribute('aria-pressed', 'false');
 
-  // Close and open a fresh popup page, as the user would.
+  // Close and open a fresh popup page, as the user would. New pages default to
+  // a light system setting, so set it to dark to prove the saved choice wins.
   await popup.close();
   popup = await context.newPage();
+  await popup.emulateMedia({ colorScheme: 'dark' });
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   expect(await theme(popup)).toBe('light');
 
