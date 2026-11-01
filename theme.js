@@ -5,10 +5,12 @@
   const KEY = 'theme';
   const systemLight = matchMedia('(prefers-color-scheme: light)');
   // Storage can throw in locked-down profiles; fall back to the system theme.
+  // A choice made in this popup wins, so a failed write can't revert it to an
+  // older stored value.
   let sessionChoice = null;
   const saved = () => {
     let value = sessionChoice;
-    try { value = localStorage.getItem(KEY) ?? sessionChoice; } catch {}
+    if (!value) { try { value = localStorage.getItem(KEY); } catch {} }
     return value === 'light' || value === 'dark' ? value : null;
   };
   const save = (value) => {

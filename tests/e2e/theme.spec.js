@@ -13,7 +13,7 @@ test('follows the system theme until the user picks one', async ({ popup }) => {
   await expect.poll(() => theme(popup)).toBe('dark');
 });
 
-test('the toggle switches themes and the choice survives reopening', async ({ popup }) => {
+test('the toggle switches themes and the choice survives reopening', async ({ context, extensionId, popup }) => {
   await popup.emulateMedia({ colorScheme: 'dark' });
   await popup.reload();
   expect(await background(popup)).toBe('rgb(19, 18, 18)');
@@ -24,7 +24,10 @@ test('the toggle switches themes and the choice survives reopening', async ({ po
   await expect(popup.locator('[data-theme-choice="light"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(popup.locator('[data-theme-choice="dark"]')).toHaveAttribute('aria-pressed', 'false');
 
-  await popup.reload();
+  // Close and open a fresh popup page, as the user would.
+  await popup.close();
+  popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   expect(await theme(popup)).toBe('light');
 
   // A saved choice wins over the system setting. theme.js registered its
