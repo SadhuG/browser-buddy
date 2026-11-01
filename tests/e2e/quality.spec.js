@@ -167,6 +167,9 @@ for (const [where, away] of [['Home', '/'], ['a Short', '/shorts/abc']]) {
     await page.evaluate(() => window.__bbStub.userSetQuality('large'));
     await expect.poll(async () => (await status(popup, page)).touched?.quality).toBe('large');
     await page.evaluate((path) => history.pushState({}, '', path), away);
+    // Leaving needs AWAY_TICKS (2) one-second ticks: wait until the bridge reports it, then
+    // allow two more ticks so a slow runner still counts the video as left.
+    await expect.poll(async () => (await status(popup, page)).surface ?? null).toBeNull();
     await page.waitForTimeout(2500);
     await page.evaluate(() => history.pushState({}, '', '/watch?v=stub1'));
     await expect.poll(() => current(page)).toBe('hd1080');

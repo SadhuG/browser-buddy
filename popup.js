@@ -109,6 +109,14 @@ function renderQualityScreen(settings) {
 const ADDABLE_LANGUAGES = ['en', 'hi', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'id', 'zh', 'ar', 'ru', 'tr', 'vi', 'th', 'nl', 'pl', 'sv', 'uk',
   'bn', 'ta', 'te', 'mr', 'ur', 'gu', 'kn', 'ml', 'pa', 'fa', 'he', 'el', 'cs', 'ro', 'hu', 'ms', 'fil', 'da', 'fi', 'no'];
 function setLanguages(myLanguages) { saveSettings({ myLanguages }); }
+function removeLanguage(index) {
+  const list = state.settings.myLanguages.filter((_, i) => i !== index);
+  setLanguages(list);
+  // The list re-renders: keep focus in it on the language that took this one's place.
+  const next = list[Math.min(index, list.length - 1)];
+  const button = $(`#myLanguages [data-lang="${next}"] .remove`);
+  (button && !button.disabled ? button : $('#addLanguage')).focus();
+}
 function moveLanguage(index, by) {
   const list = [...state.settings.myLanguages];
   [list[index], list[index + by]] = [list[index + by], list[index]];
@@ -142,7 +150,7 @@ function renderAudioScreen(settings) {
     actions.append(
       languageButton('move-up', '↑\uFE0E', `Move ${name} up`, index === 0, () => moveLanguage(index, -1)),
       languageButton('move-down', '↓\uFE0E', `Move ${name} down`, index === languages.length - 1, () => moveLanguage(index, 1)),
-      languageButton('remove', '×\uFE0E', `Remove ${name}`, languages.length === 1, () => setLanguages(languages.filter((c) => c !== code))),
+      languageButton('remove', '×\uFE0E', `Remove ${name}`, languages.length === 1, () => removeLanguage(index)),
     );
     item.append(element('span', 'language-rank', String(index + 1)), element('span', 'language-name', name), actions);
     return item;
@@ -246,6 +254,7 @@ function showFieldError(input, message, errorNode) {
   errorNode.textContent = message || '';
   errorNode.hidden = !message;
   input.setAttribute('aria-invalid', String(!!message));
+  if (message) input.setAttribute('aria-describedby', errorNode.id); else input.removeAttribute('aria-describedby');
 }
 function createPresetFrom(input, errorNode, style, { activate }) {
   const name = input.value;

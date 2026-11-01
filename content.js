@@ -42,13 +42,35 @@ chrome.runtime.onMessage.addListener((message) => {
 const isYoutubePage = /(^|\.)youtube\.com$/.test(location.hostname);
 const bridgeMessage = (type, extra = {}) => window.postMessage({ source: 'browser-buddy', to: 'page', type, ...extra }, location.origin);
 let bridgeStatus = null;
-function sendSettingsToPage() { if (isYoutubePage) bridgeMessage('settings', { settings }); }
+// YouTube's own scripts can read page messages, so send only what the bridge uses.
+const BRIDGE_SETTINGS = ['quality', 'captionsMode', 'captionStyleEnabled', 'captionStyle', 'myLanguages', 'audioTrackEnabled'];
+function sendSettingsToPage() {
+  if (!isYoutubePage) return;
+  bridgeMessage('settings', { settings: Object.fromEntries(BRIDGE_SETTINGS.map((key) => [key, settings[key]])) });
+}
+// Page scripts can post a fake status too: keep only the shape and keys the popup reads.
+const STATUS_KEYS = { touched: ['quality', 'captions', 'audio', 'captionStyle'], auto: ['quality'], unavailable: ['quality', 'captions', 'audio'] };
+function cleanStatus(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  // null is a real value here (e.g. a touched audio track without an id), so only drop missing keys.
+  const pick = (value, keys) => Object.fromEntries(keys.filter((key) => value && typeof value === 'object' && Object.hasOwn(value, key) && value[key] !== undefined).map((key) => [key, value[key]]));
+  const choice = raw.audioChoice;
+  return {
+    videoId: typeof raw.videoId === 'string' ? raw.videoId : null,
+    surface: typeof raw.surface === 'string' ? raw.surface : null,
+    viewing: Number.isFinite(raw.viewing) ? raw.viewing : 0,
+    touched: pick(raw.touched, STATUS_KEYS.touched),
+    auto: pick(raw.auto, STATUS_KEYS.auto),
+    unavailable: pick(raw.unavailable, STATUS_KEYS.unavailable),
+    ...(choice && typeof choice === 'object' ? { audioChoice: { reason: String(choice.reason), language: choice.language == null ? null : String(choice.language) } } : {}),
+  };
+}
 if (isYoutubePage) {
   window.addEventListener('message', (event) => {
     const data = event.data;
     if (event.source !== window || !data || data.source !== 'browser-buddy' || data.to !== 'extension') return;
     if (data.type === 'hello') sendSettingsToPage();
-    if (data.type === 'status') { bridgeStatus = data.status; applySettings(); }
+    if (data.type === 'status') { const status = cleanStatus(data.status); if (status) { bridgeStatus = status; applySettings(); } }
   });
 }
 function tabStatus() {
@@ -74,7 +96,15 @@ function resumeVideo() { if (!isTutorialMode() || !wasAutoPaused) return; const 
 // video; a rate change without user input (e.g. YouTube's own) is reverted.
 const speedTracker = BrowserBuddy.touch.createTouchTracker({ graceMs: 0, comparators: { speed: (a, b) => Math.abs(a - b) < .01 } });
 let lastUserInput = -Infinity;
-const markUserInput = (event) => { if (event.isTrusted) lastUserInput = performance.now(); };
+// Only input aimed at the player counts (see page-bridge.js): typing a comment isn't a speed pick.
+const PLAYER_UI = '#movie_player, #shorts-player, .html5-video-player, ytd-player, .ytp-popup, ytd-popup-container, tp-yt-iron-dropdown';
+function isPlayerInput(event) {
+  if (!event.isTrusted) return false;
+  const target = event.target instanceof Element ? event.target : null;
+  if (event.type === 'keydown') return !target || !(target.isContentEditable || target.closest('input, textarea, select'));
+  return !!target && !!target.closest(PLAYER_UI);
+}
+const markUserInput = (event) => { if (isPlayerInput(event)) lastUserInput = performance.now(); };
 const userJustActed = () => performance.now() - lastUserInput < 2000;
 window.addEventListener('pointerdown', markUserInput, true);
 window.addEventListener('keydown', markUserInput, true);
