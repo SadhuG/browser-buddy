@@ -46,11 +46,12 @@ reviews:
         characters.
     description:
       mode: error
+    # Off: plain extension JS without JSDoc, and work isn't tracked in
+    # issues, so these would warn on every PR.
     docstrings:
-      mode: warning
-      threshold: 80
+      mode: "off"
     issue_assessment:
-      mode: warning
+      mode: "off"
     custom_checks:
       - name: Docs and version in sync
         mode: error
@@ -58,8 +59,8 @@ reviews:
           If the PR changes user-facing behaviour of the extension (popup UI,
           content scripts, permissions, supported sites), it must update
           CHANGELOG.md and, where relevant, README.md. If manifest.json
-          "version" changes, package.json "version" must match and
-          CHANGELOG.md must have an entry for that version. Pass when the PR
+          "version" changes, CHANGELOG.md must have an entry for that
+          version, and if package.json has a "version" field it must match. Pass when the PR
           only touches tests, CI, or tooling config.
       - name: No new permissions without justification
         mode: error
@@ -111,9 +112,10 @@ reviews:
     - path: "popup.{html,css}"
       instructions: >-
         Check accessibility: semantic elements, labels for controls, visible
-        focus states, keyboard operation, and WCAG AA contrast. Every color
-        token must have a value in both the dark :root block and the
-        :root[data-theme="light"] block in popup.css.
+        focus states, keyboard operation, and WCAG AA contrast in every
+        theme popup.css defines. When popup.css has theme override blocks
+        (for example :root[data-theme="light"]), every color token in the
+        base :root block must also have a value in each override block.
     - path: "tests/**"
       instructions: >-
         node:test unit tests and Playwright e2e tests. Flag flaky patterns
