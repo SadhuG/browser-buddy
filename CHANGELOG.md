@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Secondary and faint text has more contrast in both themes, so the search placeholder, closed-tab titles and unselected toggle labels meet WCAG AA (4.5:1). Secondary text is brighter in dark mode and darker in light mode, keeping a clear step between regular, secondary and faint text.
+
 ## v1.2.0
 
 Release: 2026-10-29

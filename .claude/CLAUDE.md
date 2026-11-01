@@ -11,7 +11,7 @@ Manifest V3 extension for Chrome and Edge. Plain JavaScript, HTML and CSS with n
 - Tests (dev-only, never loaded by the extension): `package.json`, `playwright.config.js`, `tests/unit/` (`node:test`), `tests/e2e/` (Playwright loads the unpacked extension; `tests/e2e/fixtures.js` provides `context`, `extensionId`, `popup`, plus `serveFixture` to serve captured pages from `tests/fixtures/` at real site URLs). Run `npm test`. CI: `.github/workflows/test.yml`.
 - `fonts/`: bundled Azeret Mono variable font (+ OFL license) used by the popup, bundled so it works offline without remote requests
 
-Popup design source: Figma file "Browser Buddy", page "Popup UI". Dark: frame "Browser Buddy · Complete UI (R1)" (node 11:3719). Light: frame "Browser Buddy · Complete UI (R1) · Light" (node 14:6). The file allows only one variable mode, so the light frames use hard-coded colors, not variables. Tokens live as CSS variables at the top of `popup.css`.
+Popup design source: Figma file "Browser Buddy", page "Popup UI". Dark: frame "Browser Buddy · Complete UI (R1)" (node 11:3719). Light: frame "Browser Buddy · Complete UI (R1) · Light" (node 14:6). Both frames use hard-coded colors, not Figma variables (the file allows only one variable mode), so a token change means replacing that hex in every frame of the theme. Tokens live as CSS variables at the top of `popup.css`.
 
 Keep `README.md` and `CHANGELOG.md` in sync with user-facing changes, and bump `version` in `manifest.json` on release.
 
@@ -30,3 +30,4 @@ This file is a living document. Update it in the same change whenever the projec
 ## Rules
 
 - Use `.claude/scratch/` for Figma MCP scratch files (see above).
+- Text color tokens (`--text`, `--muted`, `--faint`, `--warn`, …) must reach WCAG AA 4.5:1 on every surface they appear on, in both themes, and keep a visible step between text, muted and faint. Change Figma and `popup.css` together.
