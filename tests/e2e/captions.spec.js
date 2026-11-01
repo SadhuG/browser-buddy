@@ -58,8 +58,9 @@ test('the next video resets', async ({ context, popup }) => {
 
 test('no tracks reports unavailable', async ({ context, popup }) => {
   const errors = [];
+  // Listen before the page opens so errors on load and in the first ticks count too.
+  context.on('page', (opened) => opened.on('pageerror', (error) => errors.push(error)));
   const page = await open(context, popup, 'on', captions([]));
-  page.on('pageerror', (error) => errors.push(error));
   await expect.poll(async () => (await status(popup, page)).unavailable?.captions, { timeout: 12000 }).toBe(true);
   expect(errors).toEqual([]);
 });
@@ -104,7 +105,8 @@ test('Use Browser Buddy setting right after a player click restores captions', a
   await expect.poll(() => isOn(page)).toBe(true);
   await page.click('#movie_player');
   await page.evaluate(() => { window.__bbStub.userSetCaptions(false); window.BrowserBuddy.bridge.tick(); });
-  expect((await status(popup, page)).touched?.captions).toBe('off');
+  // The status reaches the popup asynchronously (page -> content script -> popup).
+  await expect.poll(async () => (await status(popup, page)).touched?.captions).toBe('off');
   await clearTouch(popup, 'captions', page);
   await expect.poll(() => isOn(page)).toBe(true);
   expect((await status(popup, page)).touched?.captions).toBeUndefined();

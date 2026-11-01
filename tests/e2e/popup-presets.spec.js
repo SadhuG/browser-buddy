@@ -81,9 +81,11 @@ test('delete the active custom preset keeps the style and clears the id', async 
 });
 
 test('Save as preset? appears for a touched style', async ({ context, popup }) => {
-  await set(popup, { captionStyleEnabled: true });
+  // High contrast differs from the player's starting style, so applying it is a visible update.
+  await set(popup, { captionStyleEnabled: true, captionPresetId: 'high-contrast', captionStyle: builtIn('high-contrast') });
   const page = await openStubVideo(context, { config: { captions: { on: true, tracks: [{ languageCode: 'en', kind: '' }], track: { languageCode: 'en', kind: '' } } } });
-  await page.waitForTimeout(1500);
+  // A player change counts as a touch only after Browser Buddy has applied its own style.
+  await expect.poll(() => page.evaluate(() => window.__bbStub.callsTo('updateSubtitlesUserSettings').length)).toBeGreaterThan(0);
   await page.click('#movie_player');
   await page.evaluate(() => window.__bbStub.userSetStyle({ color: '#0f0' }));
   await expect.poll(async () => (await tabStatus(popup, page))?.touched?.captionStyle?.color).toBe('#0f0');

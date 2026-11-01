@@ -20,6 +20,8 @@ if (/(^|\.)amazon\./.test(location.hostname)) {
 let settings = BrowserBuddy.settings.normalizeSettings({});
 function loadSettings() {
   chrome.storage.local.get(null, (values) => {
+    // A failed read would normalize to defaults and reset every video: keep what we have.
+    if (chrome.runtime.lastError || !values) return;
     settings = BrowserBuddy.settings.normalizeSettings(values);
     ({ playbackSpeed, tutorialMode, subscriptionCleanMode, hideAmazonCart } = settings);
     sendSettingsToPage();

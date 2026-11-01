@@ -79,11 +79,19 @@ test('deleting the active preset clears captionPresetId but keeps captionStyle',
 });
 
 test('functions never mutate their input', () => {
-  const state = deepFreeze(withNight());
-  createPreset(state, 'Day', DEFAULT_STYLE, 'c2');
-  renamePreset(state, 'custom-1', 'Dusk');
-  updatePresetStyle(state, 'custom-1', DEFAULT_STYLE);
-  updatePresetStyle(state, 'classic', green);
-  deletePreset(state, 'custom-1');
-  resetBuiltIn(deepFreeze(updatePresetStyle(state, 'classic', green).state), 'classic');
+  // Compare against snapshots: a frozen object would make a stray write fail silently.
+  const state = withNight();
+  const before = structuredClone(state);
+  const calls = [
+    () => createPreset(state, 'Day', DEFAULT_STYLE, 'c2'),
+    () => renamePreset(state, 'custom-1', 'Dusk'),
+    () => updatePresetStyle(state, 'custom-1', DEFAULT_STYLE),
+    () => updatePresetStyle(state, 'classic', green),
+    () => deletePreset(state, 'custom-1'),
+  ];
+  for (const call of calls) { call(); assert.deepEqual(state, before); }
+  const edited = updatePresetStyle(state, 'classic', green).state;
+  const editedBefore = structuredClone(edited);
+  resetBuiltIn(edited, 'classic');
+  assert.deepEqual(edited, editedBefore);
 });

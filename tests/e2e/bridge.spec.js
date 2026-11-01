@@ -1,4 +1,4 @@
-const { test, expect, openStubVideo, tabStatus, setSetting } = require('./fixtures');
+const { test, expect, openStubVideo, tabStatus, setSetting, serveFixture, messageTab } = require('./fixtures');
 
 test('reports the stub video id and watch surface', async ({ context, popup }) => {
   await openStubVideo(context);
@@ -37,7 +37,13 @@ test('does not run on YouTube Music', async ({ context, popup }) => {
 });
 
 test('answers null on a non-YouTube tab', async ({ context, popup }) => {
+  // An Amazon page runs content.js too, so this reaches its "not YouTube" answer.
+  const url = 'https://www.amazon.co.jp/dp/B0FIXTURE';
+  await serveFixture(context, url, 'amazon/co.jp-product.html');
   const page = await context.newPage();
-  await page.goto('https://dupes.test/a');
-  expect(await tabStatus(popup, 'https://dupes.test/a')).toBeNull();
+  await page.goto(url);
+  // content.js must be running there (it answers the Amazon cart check), so the null below is
+  // its "not YouTube" answer and not a missing script.
+  await expect.poll(() => messageTab(popup, { type: 'AMAZON_CART_STATUS' }, url)).not.toBeNull();
+  expect(await tabStatus(popup, url)).toBeNull();
 });
