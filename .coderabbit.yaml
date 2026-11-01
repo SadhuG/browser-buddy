@@ -1,0 +1,155 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+#
+# Strict CodeRabbit review settings for Browser Buddy.
+# Install https://github.com/apps/coderabbitai for SadhuG/browser-buddy.
+# Public-repository PR reviews are free: https://www.coderabbit.ai/oss
+language: en-US
+enable_free_tier: true
+early_access: false
+tone_instructions: >-
+  Be direct and specific. Flag every correctness, security, privacy and
+  accessibility problem, including nitpicks. No praise, no filler.
+
+reviews:
+  # "assertive" reports nitpicks and minor issues, not just major ones.
+  profile: assertive
+  # Request changes on findings and approve once they're resolved, so the
+  # review state reflects whether the PR is ready to merge.
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  # The CodeRabbit status check fails (instead of passing) when the review errors.
+  fail_commit_status: true
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  poem: false
+  in_progress_fortune: false
+  abort_on_close: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    # Keep reviewing every push; never pause on busy PRs.
+    auto_pause_after_reviewed_commits: 0
+    drafts: false
+    base_branches:
+      - ".*"
+
+  pre_merge_checks:
+    title:
+      mode: error
+      requirements: >-
+        Use Conventional Commits: "<type>: <summary>" where type is one of
+        feat, fix, docs, chore, refactor, test, ci, perf, style. Imperative
+        mood, lower case after the colon, no trailing period, at most 72
+        characters.
+    description:
+      mode: error
+    # Off: plain extension JS without JSDoc, and work isn't tracked in
+    # issues, so these would warn on every PR.
+    docstrings:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+    custom_checks:
+      - name: Docs and version in sync
+        mode: error
+        instructions: >-
+          If the PR changes user-facing behaviour of the extension (popup UI,
+          content scripts, permissions, supported sites), it must update
+          CHANGELOG.md and, where relevant, README.md. If manifest.json
+          "version" changes, CHANGELOG.md must have an entry for that
+          version, and if package.json has a "version" field it must match. Pass when the PR
+          only touches tests, CI, or tooling config.
+      - name: No new permissions without justification
+        mode: error
+        instructions: >-
+          Fail if manifest.json adds permissions, host_permissions, or content
+          script matches unless the PR description explains why each one is
+          needed.
+
+  path_filters:
+    - "!**/node_modules/**"
+    - "!**/test-results/**"
+    - "!**/playwright-report/**"
+    - "!package-lock.json"
+    - "!fonts/**"
+    - "!tests/fixtures/**"
+
+  path_instructions:
+    - path: "manifest.json"
+      instructions: >-
+        Manifest V3 for Chrome and Edge. Enforce least privilege: question
+        every permission, host permission and content script match. No
+        remote code, no unsafe-eval or unsafe-inline in CSP, no
+        web_accessible_resources that aren't needed.
+    - path: "**/*.js"
+      instructions: >-
+        Plain browser JavaScript with no build step and no dependencies.
+        Check for: DOM XSS (innerHTML or insertAdjacentHTML with page or
+        storage data), missing null checks on querySelector results, leaked
+        listeners or MutationObservers, chrome.* API errors that are ignored
+        (chrome.runtime.lastError, rejected promises), race conditions with
+        chrome.storage, and any network request or remote resource (the
+        extension must work fully offline).
+    - path: "content.js"
+      instructions: >-
+        Runs inside YouTube and Amazon pages. Selectors must degrade
+        gracefully when the site's markup changes. Never break the host page,
+        never read or send personal data, and keep work off the main thread
+        where possible.
+    - path: "background.js"
+      instructions: >-
+        MV3 service worker: it can be terminated at any time. Flag global
+        state that is assumed to persist, and listeners not registered
+        synchronously at top level.
+    - path: "lib/**/*.js"
+      instructions: >-
+        Pure logic shared by extension scripts and Node tests. Must stay free
+        of DOM and chrome.* access, and must end with the module.exports
+        guard. Every behaviour change needs a unit test in tests/unit/.
+    - path: "popup.{html,css}"
+      instructions: >-
+        Check accessibility: semantic elements, labels for controls, visible
+        focus states, keyboard operation, and WCAG AA contrast in every
+        theme popup.css defines. When popup.css has theme override blocks
+        (for example :root[data-theme="light"]), every color token in the
+        base :root block must also have a value in each override block.
+    - path: "tests/**"
+      instructions: >-
+        node:test unit tests and Playwright e2e tests. Flag flaky patterns
+        (fixed timeouts, order dependence), missing assertions, and tests
+        that pass without exercising the behaviour they name.
+    - path: ".github/workflows/**"
+      instructions: >-
+        Least-privilege permissions block, pinned action versions, no secrets
+        exposed to pull_request from forks, no script injection from
+        untrusted github.* context.
+
+  tools:
+    biome:
+      enabled: true
+    markdownlint:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    zizmor:
+      enabled: true
+    semgrep:
+      enabled: true
+    languagetool:
+      enabled: true
+      level: default
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  code_guidelines:
+    enabled: true
