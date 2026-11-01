@@ -27,8 +27,16 @@ test('the toggle switches themes and the choice survives reopening', async ({ po
   await popup.reload();
   expect(await theme(popup)).toBe('light');
 
-  // A saved choice wins over the system setting.
+  // A saved choice wins over the system setting. theme.js registered its
+  // change listener first, so once ours has fired, theme.js has handled it too.
+  // The system is already dark here, so go light first to get a real change.
+  await popup.emulateMedia({ colorScheme: 'light' });
+  await popup.evaluate(() => {
+    window.systemChanged = false;
+    matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { window.systemChanged = true; });
+  });
   await popup.emulateMedia({ colorScheme: 'dark' });
+  await popup.waitForFunction(() => window.systemChanged);
   expect(await theme(popup)).toBe('light');
 
   await popup.click('[data-theme-choice="dark"]');
