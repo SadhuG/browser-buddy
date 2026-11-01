@@ -82,7 +82,16 @@ test('captionStyle is normalized and captionPresetId may be null', () => {
 });
 
 test('the result is a fresh copy', () => {
+  const defaults = structuredClone(DEFAULT_SETTINGS);
   const settings = normalizeSettings({});
+  // Nested values must not be shared with the defaults (or between calls).
+  assert.notEqual(settings.myLanguages, DEFAULT_SETTINGS.myLanguages);
+  assert.notEqual(settings.captionStyle, DEFAULT_SETTINGS.captionStyle);
+  assert.notEqual(settings.customPresets, DEFAULT_SETTINGS.customPresets);
   settings.playbackSpeed = 2;
-  assert.equal(DEFAULT_SETTINGS.playbackSpeed, 1);
+  settings.myLanguages.push('fr');
+  settings.captionStyle.color = '#0f0';
+  settings.customPresets.push({ id: 'x' });
+  assert.deepEqual(DEFAULT_SETTINGS, defaults);
+  assert.deepEqual(normalizeSettings({}), defaults);
 });

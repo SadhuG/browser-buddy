@@ -63,7 +63,12 @@ async function loadVideoSettings() {
 async function saveSettings(patch) {
   state.settings = BB.settings.normalizeSettings({ ...state.settings, ...patch });
   renderVideoSettings();
-  await chrome.storage.local.set(patch);
+  try {
+    await chrome.storage.local.set(patch);
+  } catch (_) {
+    // The write failed (e.g. storage quota): show what is actually stored, not the unsaved value.
+    await loadVideoSettings();
+  }
 }
 function renderVideoSettings() {
   renderYoutubeSummary(state.settings);
@@ -175,7 +180,13 @@ function setStyleField(field, raw) {
   const { state: presets } = BB.presets.updatePresetStyle(presetState(), id, captionStyle);
   saveSettings({ captionStyle, captionPresetId: id, ...presets });
 }
-function pickPreset(id) { state.editingPresetId = null; saveSettings(BB.presets.applyPreset(state.settings, id)); }
+function pickPreset(id) {
+  const hadFocus = document.activeElement?.closest?.('#presetPicker [data-preset]');
+  state.editingPresetId = null;
+  saveSettings(BB.presets.applyPreset(state.settings, id));
+  // The picker re-renders: put focus back on the same tile for keyboard users.
+  if (hadFocus) $(`#presetPicker [data-preset="${id}"]`)?.focus();
+}
 function bindCaptionControls() {
   const CS = BB.captionStyle;
   document.querySelectorAll('#captionsMode button').forEach((button) => button.addEventListener('click', () => saveSettings({ captionsMode: button.dataset.mode })));

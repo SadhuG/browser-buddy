@@ -54,7 +54,8 @@ async function touchedThenSecondTab(context, popup) {
   await expect.poll(async () => (await youtubeStyle(tabA)).color).toBe('#ff0');
   await touchGreen(popup, tabA);
   const tabB = await openStubVideo(context, { id: 'stubB', config });
-  await tabB.waitForTimeout(3000);
+  // Wait until tab B's bridge has read the shared touch, instead of a fixed delay.
+  await expect.poll(async () => (await status(popup, tabB)).touched?.captionStyle?.color, { timeout: 10000 }).toBe('#0f0');
   return { tabA, tabB };
 }
 
@@ -107,8 +108,9 @@ test('leaves a style YouTube already has alone, without blinking captions', asyn
 
 test('waits out an ad without errors', async ({ context, popup }) => {
   const errors = [];
+  // Listen before the page opens so errors on load and in the first ticks count too.
+  context.on('page', (opened) => opened.on('pageerror', (error) => errors.push(error)));
   const page = await open(context, popup, false);
-  page.on('pageerror', (error) => errors.push(error));
   await page.evaluate(() => window.__bbStub.startAd());
   await setSetting(popup, 'captionStyleEnabled', true);
   await page.waitForTimeout(2000);

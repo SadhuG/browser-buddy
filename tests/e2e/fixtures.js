@@ -78,4 +78,4 @@ async function openPopupForTab(popup, page) {
   return popup;
 }
 
-module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, tabStatus, clearTouch, openPopupForTab };
+module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, tabStatus, clearTouch, openPopupForTab, messageTab };
