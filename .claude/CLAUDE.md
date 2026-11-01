@@ -30,4 +30,4 @@ This file is a living document. Update it in the same change whenever the projec
 ## Rules
 
 - Use `.claude/scratch/` for Figma MCP scratch files (see above).
-- Text color tokens (`--text`, `--muted`, `--faint`, `--warn`, …) must reach WCAG AA 4.5:1 on every surface they appear on, in both themes, and keep a visible step between text, muted and faint. Change Figma and `popup.css` together.
+- Text color tokens (`--text`, `--muted`, `--faint`, `--warn`, …) must reach WCAG AA 4.5:1 on every surface they appear on, in both themes (disabled controls are exempt, as in WCAG 1.4.3, and stay dimmed with `--faint`), and keep a visible step between text, muted and faint. Change Figma and `popup.css` together.
