@@ -16,8 +16,16 @@
   let lastInput = -Infinity;
   let lastStatusJson = '';
 
-  // A change counts as the user's only right after real input in this page.
-  const markInput = (event) => { if (event.isTrusted) lastInput = performance.now(); };
+  // Only input aimed at the player counts: typing a comment or clicking Like isn't a choice
+  // about the video. Keys count outside text fields because YouTube's shortcuts work page-wide.
+  const PLAYER_UI = '#movie_player, #shorts-player, .html5-video-player, ytd-player, .ytp-popup, ytd-popup-container, tp-yt-iron-dropdown';
+  const isPlayerInput = (event) => {
+    if (!event.isTrusted) return false;
+    const target = event.target instanceof Element ? event.target : null;
+    if (event.type === 'keydown') return !target || !(target.isContentEditable || target.closest('input, textarea, select'));
+    return !!target && !!target.closest(PLAYER_UI);
+  };
+  const markInput = (event) => { if (isPlayerInput(event)) lastInput = performance.now(); };
   window.addEventListener('pointerdown', markInput, true);
   window.addEventListener('keydown', markInput, true);
 
@@ -161,6 +169,10 @@
       if (tracker.isTouched('quality')) { observeQualityPick(player, tracker, now, state, userInitiated); return; }
       if (preference === 'auto') {
         if (state.qualityManaged) { state.qualityManaged = false; player.setPlaybackQualityRange('auto', 'auto'); }
+        // Keep tracking YouTube's preference so switching back from Auto isn't read as a menu pick,
+        // and forget the applied quality so it is applied again.
+        if (typeof player.getUserPlaybackQualityPreference === 'function') state.lastQualityPreference = player.getUserPlaybackQualityPreference();
+        delete state.video.quality;
         return;
       }
       const available = BB.quality.normalizeQualityData(player.getAvailableQualityData());
@@ -207,8 +219,9 @@
         const tracks = player.getOption('captions', 'tracklist', { includeAsr: true }) || [];
         if (!tracks.length) {
           state.video.captionTries = (state.video.captionTries || 0) + 1;
+          // Slow connections can take a while: after the first tries, report it but keep retrying.
           if (state.video.captionTries > CAPTION_LOAD_TRIES) status.unavailable.captions = true;
-          else player.loadModule('captions');
+          if (state.video.captionTries <= CAPTION_LOAD_TRIES || state.video.captionTries % CAPTION_LOAD_TRIES === 0) player.loadModule('captions');
           return;
         }
         const myLanguages = force ? [force, ...settings.myLanguages.filter((code) => code !== force)] : settings.myLanguages;

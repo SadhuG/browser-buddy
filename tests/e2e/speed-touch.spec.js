@@ -103,3 +103,29 @@ test('coming back to a video from Home ends the speed touch', async ({ context, 
   await expect.poll(() => rate(page)).toBe(1.25);
   expect((await tabStatus(popup, page)).touched.speed).toBeUndefined();
 });
+
+test('typing in a text field outside the player is not a speed pick', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  // Like typing a comment or a search: trusted input, but not aimed at the player.
+  await page.evaluate(() => { const field = document.createElement('textarea'); field.id = 'comment'; document.body.append(field); });
+  await page.click('#comment');
+  await page.keyboard.type('nice video');
+  await setRate(page, 2);
+  await expect.poll(() => rate(page), { timeout: 2000 }).toBe(1.25);
+  expect((await tabStatus(popup, page)).touched.speed).toBeUndefined();
+});
+
+test('a status posted by the page keeps only the shape the popup reads', async ({ context, popup }) => {
+  const page = await openAt(context, popup, 1.25);
+  await page.evaluate(() => window.postMessage({
+    source: 'browser-buddy', to: 'extension', type: 'status',
+    status: { videoId: 42, viewing: 'x', touched: { quality: 'large', injected: true }, auto: 'not an object', unavailable: { captions: true } },
+  }, location.origin));
+  await expect.poll(async () => (await tabStatus(popup, page)).unavailable?.captions).toBe(true);
+  const status = await tabStatus(popup, page);
+  expect(status.videoId).toBeNull();
+  expect(status.viewing).toBe(0);
+  expect(status.touched.injected).toBeUndefined();
+  expect(status.touched.quality).toBe('large');
+  expect(status.auto).toEqual({});
+});
