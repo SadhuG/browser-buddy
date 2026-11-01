@@ -38,6 +38,9 @@
       // A new style in the popup replaces a touched style everywhere: YouTube can't show two.
       const styleOf = (s) => JSON.stringify([s.captionStyle, s.captionStyleEnabled]);
       if (settings && styleOf(settings) !== styleOf(data.settings)) endStyleTouch();
+      // A popup change is newer than any click in the player before it, so the change it causes
+      // isn't the user's touch (as with clear-touch).
+      if (settings && JSON.stringify(settings) !== JSON.stringify(data.settings)) lastInput = -Infinity;
       settings = data.settings; lastStatusJson = ''; tick();
     }
     if (data.type === 'clear-touch') {
