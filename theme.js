@@ -4,7 +4,17 @@
 (() => {
   const KEY = 'theme';
   const systemLight = matchMedia('(prefers-color-scheme: light)');
-  const saved = () => { const value = localStorage.getItem(KEY); return value === 'light' || value === 'dark' ? value : null; };
+  // Storage can throw in locked-down profiles; fall back to the system theme.
+  let sessionChoice = null;
+  const saved = () => {
+    let value = sessionChoice;
+    try { value = localStorage.getItem(KEY) ?? sessionChoice; } catch {}
+    return value === 'light' || value === 'dark' ? value : null;
+  };
+  const save = (value) => {
+    sessionChoice = value;
+    try { localStorage.setItem(KEY, value); } catch {}
+  };
   const current = () => saved() || (systemLight.matches ? 'light' : 'dark');
 
   function apply() {
@@ -22,7 +32,7 @@
   systemLight.addEventListener('change', () => { if (!saved()) apply(); });
   document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-theme-choice]').forEach((button) => button.addEventListener('click', () => {
-      localStorage.setItem(KEY, button.dataset.themeChoice);
+      save(button.dataset.themeChoice);
       apply();
     }));
     apply();
