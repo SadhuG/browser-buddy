@@ -119,3 +119,14 @@ test('waits out an ad without errors', async ({ context, popup }) => {
   await expect.poll(async () => (await youtubeStyle(page)).color).toBe('#ff0');
   expect(errors).toEqual([]);
 });
+
+// Re-showing captions downloads them again; before the video starts that download comes back
+// empty (see captions.spec.js), so the style waits for playback too.
+test('the style waits until the video starts playing', async ({ context, popup }) => {
+  await popup.evaluate((s) => chrome.storage.local.set({ captionStyleEnabled: true, captionStyle: s }), style('high-contrast'));
+  const page = await openStubVideo(context, { config: { ...config, playerState: -1 } });
+  await page.waitForTimeout(2500);
+  expect(await page.evaluate(() => window.__bbStub.callsTo('toggleSubtitles'))).toEqual([]);
+  await page.evaluate(() => window.__bbStub.setPlayerState(1));
+  await expect.poll(() => youtubeStyle(page)).toEqual(toYoutubeSettings(style('high-contrast')));
+});

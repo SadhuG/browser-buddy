@@ -21,7 +21,10 @@
   stub.callsTo = (name) => stub.calls.filter((call) => call[0] === name);
 
   define('getVideoData', () => ({ video_id: stub.state.videoId }));
-  define('getPlayerState', () => 1);
+  // 1 playing; -1 unstarted and 5 cued, as in a background tab that hasn't played yet.
+  let playerState = config.playerState ?? 1;
+  define('getPlayerState', () => playerState);
+  stub.setPlayerState = (value) => { playerState = value; };
 
   // Quality. A pick in YouTube's own menu also moves the user preference; Browser Buddy's
   // setPlaybackQualityRange does not (findings Q3).
