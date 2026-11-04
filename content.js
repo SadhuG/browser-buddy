@@ -144,6 +144,7 @@ const oneVideoActive = () => isYoutubePage && settings.oneVideoAtATime && !setti
 const isAudible = (video) => !video.muted && video.volume > 0;
 let reportedVideo = null; // the video this tab reported as started; null when not playing
 let endedTimer = null;
+let pausedKey = null; // the viewing (currentVideoKey) Browser Buddy paused, if it paused a playing video
 function reportOneVideo(event) {
   if (!oneVideoActive()) return;
   chrome.runtime.sendMessage({ type: 'ONE_VIDEO_EVENT', event }).catch(() => {});
@@ -179,14 +180,21 @@ function oneVideoPause() {
   // The worker already moved on to the other tab: this pause isn't the user's.
   reportedVideo = null;
   clearTimeout(endedTimer); endedTimer = null;
-  if (video && !video.paused) video.pause();
+  // Only a video Browser Buddy actually stopped may come back later.
+  pausedKey = video && !video.paused ? currentVideoKey() : null;
+  if (pausedKey) video.pause();
   return true;
 }
 async function oneVideoResume() {
   if (!oneVideoActive()) return false;
+  const key = pausedKey;
+  pausedKey = null;
   const video = document.querySelector('#movie_player video') || document.querySelector('video');
   if (!video) return false;
   if (!video.paused) return true;
+  // Not the viewing it paused (another video, or left for Home), or it already ended: the worker
+  // hands over to the next waiting tab instead.
+  if (!key || key !== currentVideoKey() || video.ended) return false;
   try { await video.play(); return true; } catch (_) { return false; }
 }
 

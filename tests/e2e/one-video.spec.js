@@ -94,6 +94,29 @@ test.describe('on', () => {
     await expect.poll(() => sessionState(popup)).toEqual({ current: idB, waiting: [idA], held: null });
   });
 
+  test('a waiting tab that moved to another video is not resumed', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await a.evaluate(() => { window.__bbStub.state.videoId = 'a2'; }); // the player now holds another video
+    await wait(2500);
+    await b.close();
+    await wait(1500);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
+  test('an ended video that is waiting does not replay', async ({ context }) => {
+    const a = await open(context, 'a1', 1);
+    await play(a);
+    await expect.poll(() => a.evaluate(() => document.querySelector('video').ended)).toBe(true);
+    const b = await open(context, 'b1'); // starts within A's grace, so A is put in line
+    await play(b);
+    await expect.poll(() => isPlaying(b)).toBe(true);
+    await a.evaluate(() => { window.__plays = 0; document.querySelector('video').addEventListener('play', () => { window.__plays++; }); });
+    await b.close();
+    await wait(1500);
+    expect(await a.evaluate(() => window.__plays)).toBe(0);
+  });
+
   test('tutorial mode on: nothing is tracked', async ({ context, popup }) => {
     await setSetting(popup, 'tutorialMode', true);
     await startTwo(context);
