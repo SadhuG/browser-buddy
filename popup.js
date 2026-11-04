@@ -32,6 +32,8 @@ function bindYoutubeControls() {
   document.querySelectorAll('.presets button').forEach((button) => button.addEventListener('click', () => updateSpeed(Number(button.dataset.speed))));
   $('#tutorialMode').addEventListener('change', saveTutorialPreference);
   $('#subscriptionCleanMode').addEventListener('change', saveSubscriptionPreference);
+  $('#oneVideoAtATime').addEventListener('change', (event) => saveSettings({ oneVideoAtATime: event.target.checked }));
+  document.querySelectorAll('#oneVideoResumeMode button').forEach((button) => button.addEventListener('click', () => saveSettings({ oneVideoResume: button.dataset.resume })));
   [['#qualityRow', 'qualityScreen'], ['#audioRow', 'audioScreen'], ['#captionsRow', 'captionsScreen']].forEach(([row, screen]) =>
     $(row).addEventListener('click', () => showYoutubeScreen(screen)));
   document.querySelectorAll('.back-to-youtube').forEach((link) => link.addEventListener('click', () => showYoutubeScreen('youtubeHome')));
@@ -72,6 +74,7 @@ async function saveSettings(patch) {
 }
 function renderVideoSettings() {
   renderYoutubeSummary(state.settings);
+  renderOneVideo(state.settings);
   renderQualityScreen(state.settings);
   renderCaptionsScreen(state.settings);
   renderAudioScreen(state.settings);
@@ -499,8 +502,18 @@ function updateSpeedUI(speed) {
     button.setAttribute('aria-pressed', String(active));
   });
 }
+// Through saveSettings so the One video row (which Tutorial mode overrides) updates at once.
 async function saveTutorialPreference(event) {
-  await chrome.storage.local.set({ tutorialMode: event.target.checked });
+  await saveSettings({ tutorialMode: event.target.checked });
+}
+// Tutorial mode wins: while it's on, One video at a time keeps its value but can't be changed.
+function renderOneVideo(settings) {
+  const tutorial = settings.tutorialMode;
+  $('#oneVideoAtATime').checked = settings.oneVideoAtATime;
+  $('#oneVideoAtATime').disabled = tutorial;
+  $('#oneVideoDescription').textContent = tutorial ? 'Tutorial mode is in charge.' : 'Pause other tabs when a video starts.';
+  $('#oneVideoResume').hidden = tutorial || !settings.oneVideoAtATime;
+  document.querySelectorAll('#oneVideoResumeMode button').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.resume === settings.oneVideoResume)));
 }
 async function saveSubscriptionPreference(event) {
   await chrome.storage.local.set({ subscriptionCleanMode: event.target.checked });

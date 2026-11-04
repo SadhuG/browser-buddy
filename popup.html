@@ -60,6 +60,16 @@
             <label class="toggle"><input id="tutorialMode" type="checkbox" aria-labelledby="tutorialTitle" aria-describedby="tutorialDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
           </div>
           <div class="setting-row">
+            <div class="row-text"><h2 id="oneVideoTitle">One video at a time</h2><p id="oneVideoDescription">Pause other tabs when a video starts.</p></div>
+            <label class="toggle"><input id="oneVideoAtATime" type="checkbox" aria-labelledby="oneVideoTitle" aria-describedby="oneVideoDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
+          </div>
+          <div id="oneVideoResume" class="resume-choice" hidden>
+            <p id="oneVideoResumeLabel" class="label">When it ends or its tab closes, resume</p>
+            <div id="oneVideoResumeMode" class="seg-control" role="group" aria-labelledby="oneVideoResumeLabel">
+              <button data-resume="previous" type="button">Previous video</button><button data-resume="first" type="button">First video</button>
+            </div>
+          </div>
+          <div class="setting-row">
             <div class="row-text"><h2 id="subscriptionCleanTitle">Subscription clean</h2><p id="subscriptionCleanDescription">Hide Shorts and “Most relevant” on Subscriptions.</p></div>
             <label class="toggle"><input id="subscriptionCleanMode" type="checkbox" aria-labelledby="subscriptionCleanTitle" aria-describedby="subscriptionCleanDescription"><span class="toggle-off">off</span><span class="toggle-on">on</span></label>
           </div>
