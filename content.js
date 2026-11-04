@@ -25,7 +25,7 @@ function loadSettings() {
     settings = BrowserBuddy.settings.normalizeSettings(values);
     ({ playbackSpeed, tutorialMode, subscriptionCleanMode, hideAmazonCart } = settings);
     sendSettingsToPage();
-    applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
+    applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); syncOneVideo();
   });
 }
 loadSettings();
@@ -38,6 +38,8 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message.type === 'AMAZON_CART_STATUS') return Promise.resolve({ found: amazonCartSidebarFound() });
   if (message.type === 'GET_TAB_STATUS') return Promise.resolve(tabStatus());
   if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); return Promise.resolve(true); }
+  if (message.type === 'ONE_VIDEO_PAUSE') return Promise.resolve(oneVideoPause());
+  if (message.type === 'ONE_VIDEO_RESUME') return oneVideoResume();
 });
 
 // Relay to page-bridge.js, which runs in the page's world and calls YouTube's player.
@@ -134,6 +136,58 @@ function applySettings() {
     video.playbackRate = playbackSpeed;
   }
   speedTracker.applied('speed', playbackSpeed, Date.now());
+}
+
+// One video at a time: report this tab's audible playback to the service worker, which pauses
+// and resumes tabs (lib/one-video.js). Tutorial mode wins: while it's on, this stands down.
+const oneVideoActive = () => isYoutubePage && settings.oneVideoAtATime && !settings.tutorialMode;
+const isAudible = (video) => !video.muted && video.volume > 0;
+let reportedVideo = null; // the video this tab reported as started; null when not playing
+let endedTimer = null;
+function reportOneVideo(event) {
+  if (!oneVideoActive()) return;
+  chrome.runtime.sendMessage({ type: 'ONE_VIDEO_EVENT', event }).catch(() => {});
+}
+function onMediaEvent(event) {
+  const video = event.target;
+  if (!(video instanceof HTMLVideoElement) || !oneVideoActive()) return;
+  if ((event.type === 'playing' || event.type === 'volumechange') && !video.paused && isAudible(video)) {
+    clearTimeout(endedTimer); endedTimer = null;
+    if (reportedVideo !== video) { reportedVideo = video; reportOneVideo('started'); }
+    return;
+  }
+  if (video !== reportedVideo) return;
+  if (event.type === 'ended') {
+    reportedVideo = null;
+    clearTimeout(endedTimer);
+    // Autoplay, a playlist or an ad handing over plays again in this tab within the grace.
+    endedTimer = setTimeout(() => { endedTimer = null; if (!reportedVideo) reportOneVideo('finished'); }, BrowserBuddy.oneVideo.ENDED_GRACE_MS);
+  } else if ((event.type === 'pause' && !video.ended) || (event.type === 'volumechange' && !isAudible(video))) {
+    reportedVideo = null;
+    reportOneVideo('paused');
+  }
+}
+if (isYoutubePage) ['playing', 'pause', 'ended', 'volumechange'].forEach((type) => document.addEventListener(type, onMediaEvent, true));
+// Turned on (or Tutorial mode off) while a video already plays: report it, so the next start pauses it.
+function syncOneVideo() {
+  if (!oneVideoActive()) { reportedVideo = null; return; }
+  const playing = [...document.querySelectorAll('video')].find((v) => !v.paused && isAudible(v));
+  if (playing && playing !== reportedVideo) { reportedVideo = playing; reportOneVideo('started'); }
+}
+function oneVideoPause() {
+  const video = reportedVideo || [...document.querySelectorAll('video')].find((v) => !v.paused && isAudible(v));
+  // The worker already moved on to the other tab: this pause isn't the user's.
+  reportedVideo = null;
+  clearTimeout(endedTimer); endedTimer = null;
+  if (video && !video.paused) video.pause();
+  return true;
+}
+async function oneVideoResume() {
+  if (!oneVideoActive()) return false;
+  const video = document.querySelector('#movie_player video') || document.querySelector('video');
+  if (!video) return false;
+  if (!video.paused) return true;
+  try { await video.play(); return true; } catch (_) { return false; }
 }
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }

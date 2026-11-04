@@ -1,0 +1,120 @@
+const { test, expect, openStubVideo, setSetting } = require('./fixtures');
+
+const GRACE_MS = 8000; // lib/one-video.js ENDED_GRACE_MS
+const open = (context, id, seconds = 30) => openStubVideo(context, { id, config: { media: { seconds } } });
+const play = (page) => page.evaluate(() => document.querySelector('video').play());
+const pauseVideo = (page) => page.evaluate(() => document.querySelector('video').pause());
+const isPlaying = (page) => page.evaluate(() => !document.querySelector('video').paused);
+const sessionState = (popup) => popup.evaluate(async () => (await chrome.storage.session.get('oneVideo')).oneVideo ?? null);
+const tabId = (popup, id) => popup.evaluate(async (v) => (await chrome.tabs.query({ url: `https://www.youtube.com/watch?v=${v}` }))[0]?.id, id);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function startTwo(context, { seconds } = {}) {
+  const a = await open(context, 'a1');
+  await play(a);
+  await expect.poll(() => isPlaying(a)).toBe(true);
+  const b = await open(context, 'b1', seconds);
+  await play(b);
+  await expect.poll(() => isPlaying(b)).toBe(true);
+  return { a, b };
+}
+
+test.describe('on', () => {
+  test.beforeEach(async ({ popup }) => { await setSetting(popup, 'oneVideoAtATime', true); });
+
+  test('starting a video in a second tab pauses the first', async ({ context }) => {
+    const { a } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+  });
+
+  test('closing the second tab resumes the first', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await b.close();
+    await expect.poll(() => isPlaying(a)).toBe(true);
+  });
+
+  test('pausing the second video leaves the first paused', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await pauseVideo(b);
+    await wait(1000);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
+  test('a video that ends resumes the first after the grace', async ({ context }) => {
+    test.setTimeout(30000);
+    const { a } = await startTwo(context, { seconds: 1 });
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await expect.poll(() => isPlaying(a), { timeout: GRACE_MS + 4000 }).toBe(true);
+  });
+
+  test('video that plays again within the grace keeps the other paused', async ({ context }) => {
+    test.setTimeout(30000);
+    const { a, b } = await startTwo(context, { seconds: 1 });
+    await expect.poll(() => b.evaluate(() => document.querySelector('video').ended)).toBe(true);
+    await play(b); // like autoplay or a playlist moving on in the same tab
+    await wait(GRACE_MS + 1000);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
+  test('muted video does not pause others', async ({ context }) => {
+    const a = await open(context, 'a1');
+    await play(a);
+    const b = await open(context, 'b1');
+    await b.evaluate(() => { document.querySelector('video').muted = true; });
+    await play(b);
+    await expect.poll(() => isPlaying(b)).toBe(true);
+    await wait(1000);
+    expect(await isPlaying(a)).toBe(true);
+  });
+
+  test('navigating the playing tab off YouTube resumes the first', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await b.goto('https://dupes.test/elsewhere');
+    await expect.poll(() => isPlaying(a)).toBe(true);
+  });
+
+  test('first mode: closing C resumes A and B stays paused', async ({ context, popup }) => {
+    await setSetting(popup, 'oneVideoResume', 'first');
+    const { a, b } = await startTwo(context);
+    const c = await open(context, 'c1');
+    await play(c);
+    await expect.poll(() => isPlaying(b)).toBe(false);
+    await c.close();
+    await expect.poll(() => isPlaying(a)).toBe(true);
+    expect(await isPlaying(b)).toBe(false);
+  });
+
+  test('state is kept in session storage', async ({ context, popup }) => {
+    const { a } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    const [idA, idB] = [await tabId(popup, 'a1'), await tabId(popup, 'b1')];
+    await expect.poll(() => sessionState(popup)).toEqual({ current: idB, waiting: [idA], held: null });
+  });
+
+  test('tutorial mode on: nothing is tracked', async ({ context, popup }) => {
+    await setSetting(popup, 'tutorialMode', true);
+    await startTwo(context);
+    await wait(1000);
+    expect(await sessionState(popup)).toBe(null);
+  });
+});
+
+test('feature off: both videos play', async ({ context }) => {
+  const { a } = await startTwo(context);
+  await wait(1000);
+  expect(await isPlaying(a)).toBe(true);
+});
+
+test('turning it on while a video plays tracks that video', async ({ context, popup }) => {
+  const a = await open(context, 'a1');
+  await play(a);
+  await expect.poll(() => isPlaying(a)).toBe(true);
+  await setSetting(popup, 'oneVideoAtATime', true);
+  await wait(500);
+  const b = await open(context, 'b1');
+  await play(b);
+  await expect.poll(() => isPlaying(a)).toBe(false);
+});

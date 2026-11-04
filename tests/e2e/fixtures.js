@@ -7,7 +7,8 @@ const test = base.extend({
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+      // Tests start videos with play() from page scripts, which has no user gesture.
+      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--autoplay-policy=no-user-gesture-required'],
     });
     await context.route('https://dupes.test/**', (route) =>
       route.fulfill({ contentType: 'text/html', body: `<title>${new URL(route.request().url()).pathname}</title>` }));
