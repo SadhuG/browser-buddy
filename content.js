@@ -164,11 +164,33 @@ function onMediaEvent(event) {
     // Autoplay, a playlist or an ad handing over plays again in this tab within the grace.
     endedTimer = setTimeout(() => { endedTimer = null; if (!reportedVideo) reportOneVideo('finished'); }, BrowserBuddy.oneVideo.ENDED_GRACE_MS);
   } else if ((event.type === 'pause' && !video.ended) || (event.type === 'volumechange' && !isAudible(video))) {
+    if (leftTimer) return; // a pause from leaving the video page: the left check decides
     reportedVideo = null;
     reportOneVideo('paused');
   }
 }
 if (isYoutubePage) ['playing', 'pause', 'ended', 'volumechange'].forEach((type) => document.addEventListener(type, onMediaEvent, true));
+// Leaving the video page in the tab (Back, the logo, Home, search) unloads the player with no
+// pause event, and Back fires no yt-navigate-start (checked live 2026-11-22). So after
+// yt-navigate-finish lands off a video page, tell the worker this tab is done, as if closed.
+// A video still playing there (the mini-player) isn't done.
+const LEFT_CHECK_MS = 1000;
+const isVideoPage = () => /^\/(watch$|shorts\/|live\/)/.test(location.pathname);
+let leftTimer = null;
+function onYoutubeNavigated() {
+  clearTimeout(leftTimer); leftTimer = null;
+  if (!oneVideoActive() || isVideoPage()) return;
+  leftTimer = setTimeout(() => {
+    leftTimer = null;
+    if (!oneVideoActive() || isVideoPage()) return;
+    const video = reportedVideo;
+    if (video && video.isConnected && !video.paused && isAudible(video)) return;
+    reportedVideo = null;
+    clearTimeout(endedTimer); endedTimer = null;
+    reportOneVideo('left');
+  }, LEFT_CHECK_MS);
+}
+if (isYoutubePage) document.addEventListener('yt-navigate-finish', onYoutubeNavigated);
 // Turned on (or Tutorial mode off) while a video already plays: report it, so the next start pauses it.
 function syncOneVideo() {
   if (!oneVideoActive()) { reportedVideo = null; return; }

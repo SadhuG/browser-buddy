@@ -54,6 +54,8 @@ async function handleOneVideo(event) {
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.type !== 'ONE_VIDEO_EVENT' || !sender.tab?.id) return;
   if (['started', 'paused', 'finished'].includes(message.event)) enqueueOneVideo({ type: message.event, tabId: sender.tab.id });
+  // The tab left the video page for another YouTube page: done with that video, as if closed.
+  else if (message.event === 'left') enqueueOneVideo({ type: 'closed', tabId: sender.tab.id });
 });
 chrome.tabs.onRemoved.addListener((tabId) => enqueueOneVideo({ type: 'closed', tabId }));
 // Leaving YouTube in a tab ends its video just like closing the tab.

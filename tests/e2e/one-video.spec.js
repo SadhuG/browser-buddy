@@ -76,6 +76,56 @@ test.describe('on', () => {
     await expect.poll(() => isPlaying(a)).toBe(true);
   });
 
+  // In-page navigation as real YouTube does it (checked live 2026-11-22): the URL changes,
+  // `yt-navigate-finish` fires, and the player is unloaded with no `pause` event. Back fires
+  // no `yt-navigate-start`, so only the finish is simulated. unload: false is the mini-player.
+  const navigateInPage = (page, path, { unload = true } = {}) => page.evaluate(([to, unloadPlayer]) => {
+    history.pushState({}, '', to);
+    document.dispatchEvent(new CustomEvent('yt-navigate-finish', { bubbles: true }));
+    if (unloadPlayer) { const v = document.querySelector('video'); v.removeAttribute('src'); v.srcObject = null; v.load(); }
+  }, [path, unload]);
+
+  test('leaving the playing video for Home resumes the first', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await navigateInPage(b, '/');
+    await expect.poll(() => isPlaying(a)).toBe(true);
+  });
+
+  test('going back to search results resumes the first', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await navigateInPage(b, '/results?search_query=lofi');
+    await expect.poll(() => isPlaying(a)).toBe(true);
+  });
+
+  test('leaving a video the user paused leaves the first paused', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await pauseVideo(b);
+    await wait(500);
+    await navigateInPage(b, '/');
+    await wait(2500);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
+  test('a video still playing in the mini-player keeps the first paused', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await navigateInPage(b, '/', { unload: false });
+    await wait(2500);
+    expect(await isPlaying(b)).toBe(true);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
+  test('moving to another video in the same tab keeps the first paused', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    await navigateInPage(b, '/watch?v=b2');
+    await wait(2500);
+    expect(await isPlaying(a)).toBe(false);
+  });
+
   test('first mode: closing C resumes A and B stays paused', async ({ context, popup }) => {
     await setSetting(popup, 'oneVideoResume', 'first');
     const { a, b } = await startTwo(context);

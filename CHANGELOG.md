@@ -4,7 +4,7 @@
 
 ### Added
 
-- One video at a time (YouTube, off by default). Starting a video in one tab pauses the video playing in another, and the paused one resumes when the new video ends or its tab closes. Pausing a video yourself resumes nothing. With three or more videos, choose whether the previous video or the first one comes back. Muted videos don't count, and Tutorial mode takes over while it's on.
+- One video at a time (YouTube, off by default). Starting a video in one tab pauses the video playing in another, and the paused one resumes when the new video ends, its tab closes, or you go back from it to another YouTube page. Pausing a video yourself resumes nothing. With three or more videos, choose whether the previous video or the first one comes back. Muted videos don't count, and Tutorial mode takes over while it's on.
 
 ### Fixed
 
