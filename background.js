@@ -1,6 +1,9 @@
 importScripts('lib/one-video.js');
 let lastActiveYoutubeTabId = null;
-function isYoutube(url) { try { return typeof url === 'string' && /(^|\.)youtube\.com/.test(new URL(url).hostname); } catch (_) { return false; } }
+// The YouTube pages content.js runs on (manifest.json): youtube.com and its subdomains, minus YouTube Music.
+function isYoutube(url) {
+  try { const host = new URL(url).hostname; return /(^|\.)youtube\.com$/.test(host) && host !== 'music.youtube.com'; } catch (_) { return false; }
+}
 
 async function notify(tabId, type) {
   if (!tabId) return;

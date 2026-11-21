@@ -144,9 +144,14 @@ const oneVideoActive = () => isYoutubePage && settings.oneVideoAtATime && !setti
 const isAudible = (video) => !video.muted && video.volume > 0;
 let reportedVideo = null; // the video this tab reported as started; null when not playing
 let endedTimer = null;
-let pausedKey = null; // the viewing (currentVideoKey) Browser Buddy paused, if it paused a playing video
+// What Browser Buddy paused, if it paused a playing video: that element and its viewing
+// (currentVideoKey). Only that viewing, in that element, may come back.
+let pausedVideo = null;
+let pausedKey = null;
+let documentReported = false; // whether this page has told the worker anything yet
 function reportOneVideo(event) {
   if (!oneVideoActive()) return;
+  documentReported = true;
   chrome.runtime.sendMessage({ type: 'ONE_VIDEO_EVENT', event }).catch(() => {});
 }
 function onMediaEvent(event) {
@@ -164,36 +169,57 @@ function onMediaEvent(event) {
     // Autoplay, a playlist or an ad handing over plays again in this tab within the grace.
     endedTimer = setTimeout(() => { endedTimer = null; if (!reportedVideo) reportOneVideo('finished'); }, BrowserBuddy.oneVideo.ENDED_GRACE_MS);
   } else if ((event.type === 'pause' && !video.ended) || (event.type === 'volumechange' && !isAudible(video))) {
-    if (leftTimer) return; // a pause from leaving the video page: the left check decides
+    // Off a video page this is the mini-player, or the player going away: the left check decides.
+    if (!isVideoPage()) { scheduleLeftCheck(); return; }
     reportedVideo = null;
     reportOneVideo('paused');
   }
 }
 if (isYoutubePage) ['playing', 'pause', 'ended', 'volumechange'].forEach((type) => document.addEventListener(type, onMediaEvent, true));
 // Leaving the video page in the tab (Back, the logo, Home, search) unloads the player with no
-// pause event, and Back fires no yt-navigate-start (checked live 2026-11-22). So after
-// yt-navigate-finish lands off a video page, tell the worker this tab is done, as if closed.
-// A video still playing there (the mini-player) isn't done.
+// pause event, and Back fires no yt-navigate-start. Closing the mini-player fires pause, then
+// unloads it; pausing the mini-player fires only pause and keeps the video loaded (all checked
+// live 2026-11-22). So a moment after landing off a video page, or after a pause there: still
+// playing is the mini-player (nothing to report), loaded but quiet is a pause, and an unloaded
+// player means the tab is done with its video, as if closed.
 const LEFT_CHECK_MS = 1000;
 const isVideoPage = () => /^\/(watch$|shorts\/|live\/)/.test(location.pathname);
 let leftTimer = null;
-function onYoutubeNavigated() {
-  clearTimeout(leftTimer); leftTimer = null;
-  if (!oneVideoActive() || isVideoPage()) return;
+function scheduleLeftCheck() {
+  clearTimeout(leftTimer);
   leftTimer = setTimeout(() => {
     leftTimer = null;
     if (!oneVideoActive() || isVideoPage()) return;
     const video = reportedVideo;
-    if (video && video.isConnected && !video.paused && isAudible(video)) return;
+    const loaded = video && video.isConnected && video.readyState > HTMLMediaElement.HAVE_NOTHING;
+    if (loaded && !video.paused && isAudible(video)) return;
     reportedVideo = null;
     clearTimeout(endedTimer); endedTimer = null;
-    reportOneVideo('left');
+    reportOneVideo(loaded ? 'paused' : 'left');
   }, LEFT_CHECK_MS);
 }
+function onYoutubeNavigated() {
+  clearTimeout(leftTimer); leftTimer = null;
+  if (oneVideoActive() && !isVideoPage()) scheduleLeftCheck();
+}
 if (isYoutubePage) document.addEventListener('yt-navigate-finish', onYoutubeNavigated);
-// Turned on (or Tutorial mode off) while a video already plays: report it, so the next start pauses it.
+const LOAD_CHECK_MS = 3000;
+let loadCheckScheduled = false;
+// Turned on (or Tutorial mode off) while a video already plays: report it, so the next start pauses
+// it. Turned off: drop everything pending, so nothing from before reaches a later session.
 function syncOneVideo() {
-  if (!oneVideoActive()) { reportedVideo = null; return; }
+  if (!oneVideoActive()) {
+    reportedVideo = null; pausedVideo = null; pausedKey = null;
+    clearTimeout(endedTimer); endedTimer = null;
+    clearTimeout(leftTimer); leftTimer = null;
+    return;
+  }
+  // A new page in this tab (a reload, a link) ends whatever its old page was playing. If this page
+  // hasn't started anything soon, tell the worker, so a video waiting on that old page comes back.
+  if (!loadCheckScheduled) {
+    loadCheckScheduled = true;
+    setTimeout(() => { if (!documentReported) reportOneVideo('left'); }, LOAD_CHECK_MS);
+  }
   const playing = [...document.querySelectorAll('video')].find((v) => !v.paused && isAudible(v));
   if (playing && playing !== reportedVideo) { reportedVideo = playing; reportOneVideo('started'); }
 }
@@ -203,21 +229,24 @@ function oneVideoPause() {
   reportedVideo = null;
   clearTimeout(endedTimer); endedTimer = null;
   // Only a video Browser Buddy actually stopped may come back later.
-  pausedKey = video && !video.paused ? currentVideoKey() : null;
-  if (pausedKey) video.pause();
+  const stopping = video && !video.paused;
+  pausedVideo = stopping ? video : null;
+  pausedKey = stopping ? currentVideoKey() : null;
+  if (stopping) video.pause();
   return true;
 }
 async function oneVideoResume() {
   if (!oneVideoActive()) return false;
-  const key = pausedKey;
-  pausedKey = null;
-  const video = document.querySelector('#movie_player video') || document.querySelector('video');
-  if (!video) return false;
+  const [video, key] = [pausedVideo, pausedKey];
+  pausedVideo = null; pausedKey = null;
+  // Not the viewing it paused (another video, left for Home, the element replaced), or it already
+  // ended: the worker hands over to the next waiting tab instead.
+  if (!video || !video.isConnected || key !== currentVideoKey() || video.ended) return false;
   if (!video.paused) return true;
-  // Not the viewing it paused (another video, or left for Home), or it already ended: the worker
-  // hands over to the next waiting tab instead.
-  if (!key || key !== currentVideoKey() || video.ended) return false;
-  try { await video.play(); return true; } catch (_) { return false; }
+  // The worker already counts this tab as playing, so its own playing event isn't a new start
+  // (a new start would pause whichever tab began in the meantime).
+  reportedVideo = video;
+  try { await video.play(); return true; } catch (_) { if (reportedVideo === video) reportedVideo = null; return false; }
 }
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }
