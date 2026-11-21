@@ -235,7 +235,8 @@ function oneVideoPause() {
   if (stopping) video.pause();
   return true;
 }
-const RESUME_TIMEOUT_MS = 2000;
+// Long enough for a background tab to rebuffer on a slow connection; other tabs' events wait at most this.
+const RESUME_TIMEOUT_MS = 5000;
 async function oneVideoResume() {
   if (!oneVideoActive()) return false;
   const [video, key] = [pausedVideo, pausedKey];

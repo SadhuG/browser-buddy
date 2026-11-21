@@ -117,7 +117,7 @@ test.describe('on', () => {
     });
     await c.close();
     try {
-      await expect.poll(() => isPlaying(a)).toBe(true);
+      await expect.poll(() => isPlaying(a), { timeout: 10000 }).toBe(true); // after content.js RESUME_TIMEOUT_MS
       expect(await isPlaying(b)).toBe(false);
     } finally {
       releaseMedia();
