@@ -4,7 +4,7 @@
 
 ### Added
 
-- One video at a time (YouTube, off by default). Starting a video in one tab pauses the video playing in another, and the paused one resumes when the new video ends, its tab closes, or you go back from it to another YouTube page. Pausing a video yourself resumes nothing. With three or more videos, choose whether the previous video or the first one comes back. Muted videos don't count, and Tutorial mode takes over while it's on.
+- One video at a time (YouTube, off by default). Starting a video in one tab pauses the video playing in another. When the new video ends, its tab closes, or you leave it for another page, Browser Buddy tries to resume a video it paused. The video must still be open in the same tab and able to play with sound. If it cannot resume, Browser Buddy tries the next waiting tab. Pausing a video yourself resumes nothing. With three or more videos, choose whether the previous video or the first one comes back. Muted videos don't count, and Tutorial mode takes over while it's on.
 
 ### Fixed
 

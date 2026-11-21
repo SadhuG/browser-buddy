@@ -65,8 +65,10 @@ test.describe('on', () => {
     await expect.poll(() => isPlaying(a)).toBe(false);
     await countPlays(a);
     await expect.poll(() => b.evaluate(() => document.querySelector('video').ended)).toBe(true);
+    await b.evaluate(() => { document.querySelector('video').loop = true; });
     await play(b); // like autoplay or a playlist moving on in the same tab
     await wait(GRACE_MS + 1000);
+    expect(await isPlaying(b)).toBe(true);
     expect(await a.evaluate(() => window.__plays)).toBe(0); // not even briefly
   });
 
@@ -79,6 +81,49 @@ test.describe('on', () => {
     await expect.poll(() => isPlaying(b)).toBe(true);
     await wait(1000);
     expect(await isPlaying(a)).toBe(true);
+  });
+
+  for (const [name, property, value] of [['muted', 'muted', true], ['silent', 'volume', 0]]) {
+    test(`a waiting video made ${name} yields to the next waiting video`, async ({ context }) => {
+      const { a, b } = await startTwo(context);
+      await expect.poll(() => isPlaying(a)).toBe(false);
+      const c = await open(context, 'c1');
+      await play(c);
+      await expect.poll(() => isPlaying(b)).toBe(false);
+      await b.evaluate(([key, setting]) => { document.querySelector('video')[key] = setting; }, [property, value]);
+      await c.close();
+      await expect.poll(() => isPlaying(a)).toBe(true);
+      expect(await isPlaying(b)).toBe(false);
+    });
+  }
+
+  test('a stalled resume gives the next waiting video its turn', async ({ context }) => {
+    const { a, b } = await startTwo(context);
+    await expect.poll(() => isPlaying(a)).toBe(false);
+    const c = await open(context, 'c1');
+    await play(c);
+    await expect.poll(() => isPlaying(b)).toBe(false);
+    let releaseMedia;
+    const mediaReady = new Promise((resolve) => { releaseMedia = resolve; });
+    await context.route('https://www.youtube.com/stalled-media.wav', async (route) => {
+      await mediaReady;
+      await route.fulfill({ contentType: 'audio/wav', body: silentWav(30) });
+    });
+    await b.evaluate(() => {
+      const video = document.querySelector('video');
+      video.preload = 'none';
+      video.src = '/stalled-media.wav';
+      video.addEventListener('playing', () => { window.__resumed = true; });
+    });
+    await c.close();
+    try {
+      await expect.poll(() => isPlaying(a)).toBe(true);
+      expect(await isPlaying(b)).toBe(false);
+    } finally {
+      releaseMedia();
+    }
+    await b.waitForFunction(() => document.querySelector('video').readyState >= HTMLMediaElement.HAVE_FUTURE_DATA);
+    expect(await b.evaluate(() => window.__resumed)).toBeUndefined();
   });
 
   test('navigating the playing tab off YouTube resumes the first', async ({ context }) => {

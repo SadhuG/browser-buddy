@@ -235,18 +235,35 @@ function oneVideoPause() {
   if (stopping) video.pause();
   return true;
 }
+const RESUME_TIMEOUT_MS = 2000;
 async function oneVideoResume() {
   if (!oneVideoActive()) return false;
   const [video, key] = [pausedVideo, pausedKey];
   pausedVideo = null; pausedKey = null;
   // Not the viewing it paused (another video, left for Home, the element replaced), or it already
   // ended: the worker hands over to the next waiting tab instead.
-  if (!video || !video.isConnected || key !== currentVideoKey() || video.ended) return false;
+  if (!video || !video.isConnected || key !== currentVideoKey() || video.ended || !isAudible(video)) return false;
   if (!video.paused) return true;
   // The worker already counts this tab as playing, so its own playing event isn't a new start
   // (a new start would pause whichever tab began in the meantime).
   reportedVideo = video;
-  try { await video.play(); return true; } catch (_) { if (reportedVideo === video) reportedVideo = null; return false; }
+  let timer;
+  try {
+    const timeout = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        // Cancel the pending play before the worker hands over to another tab.
+        if (reportedVideo === video) reportedVideo = null;
+        video.pause();
+        resolve(false);
+      }, RESUME_TIMEOUT_MS);
+    });
+    return await Promise.race([video.play().then(() => true), timeout]);
+  } catch (_) {
+    if (reportedVideo === video) reportedVideo = null;
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }

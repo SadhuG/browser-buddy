@@ -1,4 +1,4 @@
-const { test, expect, openStubVideo, tabStatus, setSetting, clearTouch } = require('./fixtures');
+const { test, expect, openStubVideo, waitForApplier, tabStatus, setSetting, clearTouch } = require('./fixtures');
 const { BUILT_IN_PRESETS, toYoutubeSettings } = require('../../lib/caption-style.js');
 
 const style = (id) => BUILT_IN_PRESETS.find((p) => p.id === id).style;
@@ -125,7 +125,7 @@ test('waits out an ad without errors', async ({ context, popup }) => {
 test('the style waits until the video starts playing', async ({ context, popup }) => {
   await popup.evaluate((s) => chrome.storage.local.set({ captionStyleEnabled: true, captionStyle: s }), style('high-contrast'));
   const page = await openStubVideo(context, { config: { ...config, playerState: -1 } });
-  await page.waitForTimeout(2500);
+  await waitForApplier(page, 'captionStyle');
   expect(await page.evaluate(() => window.__bbStub.callsTo('toggleSubtitles'))).toEqual([]);
   await page.evaluate(() => window.__bbStub.setPlayerState(1));
   await expect.poll(() => youtubeStyle(page)).toEqual(toYoutubeSettings(style('high-contrast')));
