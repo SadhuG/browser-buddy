@@ -172,6 +172,21 @@ test.describe('on', () => {
     if (unloadPlayer) { const v = document.querySelector('video'); v.removeAttribute('src'); v.srcObject = null; v.load(); }
   }, [path, unload]);
 
+  test('closing the mini-player during a pending resume resumes the next video', async ({ context }) => {
+    const { a, b, releaseMedia } = await stallResume(context);
+    try {
+      await navigateInPage(b, '/', { unload: false });
+      await b.evaluate(() => {
+        const video = document.querySelector('video');
+        video.pause();
+        setTimeout(() => { video.removeAttribute('src'); video.load(); }, 150);
+      });
+      await expect.poll(() => isPlaying(a)).toBe(true);
+    } finally {
+      releaseMedia();
+    }
+  });
+
   test('leaving the playing video for Home resumes the first', async ({ context }) => {
     const { a, b } = await startTwo(context);
     await expect.poll(() => isPlaying(a)).toBe(false);

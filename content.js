@@ -172,7 +172,11 @@ function onMediaEvent(event) {
   if (event.type === 'pause' && video.paused && !video.ended &&
       pendingResume?.video === video && pendingResume.key === currentVideoKey()) {
     reportedVideo = null;
-    pendingResume.finish('paused');
+    if (isVideoPage()) pendingResume.finish('paused');
+    else {
+      clearTimeout(leftTimer); leftTimer = null;
+      pendingResume.checkMiniPlayer();
+    }
     return;
   }
   if (event.type === 'ended') {
@@ -196,6 +200,7 @@ if (isYoutubePage) ['playing', 'pause', 'ended', 'volumechange'].forEach((type) 
 // player means the tab is done with its video, as if closed.
 const LEFT_CHECK_MS = 1000;
 const isVideoPage = () => /^\/(watch$|shorts\/|live\/)/.test(location.pathname);
+const isLoaded = (video) => video && video.isConnected && video.readyState > HTMLMediaElement.HAVE_NOTHING;
 let leftTimer = null;
 function scheduleLeftCheck() {
   clearTimeout(leftTimer);
@@ -203,7 +208,7 @@ function scheduleLeftCheck() {
     leftTimer = null;
     if (!oneVideoActive() || isVideoPage()) return;
     const video = reportedVideo;
-    const loaded = video && video.isConnected && video.readyState > HTMLMediaElement.HAVE_NOTHING;
+    const loaded = isLoaded(video);
     if (loaded && !video.paused && isAudible(video)) return;
     reportedVideo = null;
     clearTimeout(endedTimer); endedTimer = null;
@@ -262,7 +267,17 @@ async function oneVideoResume() {
   // (a new start would pause whichever tab began in the meantime).
   reportedVideo = video;
   let timer;
-  const attempt = { video, key, finish: null };
+  let checkingMiniPlayer = false;
+  const onEmptied = () => attempt.finish(false);
+  const attempt = {
+    video, key, finish: null,
+    checkMiniPlayer() {
+      checkingMiniPlayer = true;
+      clearTimeout(timer);
+      video.addEventListener('emptied', onEmptied, { once: true });
+      timer = setTimeout(() => attempt.finish(isLoaded(video) ? 'paused' : false), LEFT_CHECK_MS);
+    },
+  };
   try {
     const interrupted = new Promise((resolve) => {
       attempt.finish = (result) => {
@@ -280,12 +295,17 @@ async function oneVideoResume() {
         if (stillOwnsPlayback) video.pause();
       }, RESUME_TIMEOUT_MS);
     });
-    return await Promise.race([video.play().then(() => true), interrupted]);
+    const playing = video.play().then(() => true, (error) => {
+      if (checkingMiniPlayer) return interrupted;
+      throw error;
+    });
+    return await Promise.race([playing, interrupted]);
   } catch (_) {
     if (reportedVideo === video) reportedVideo = null;
     return false;
   } finally {
     clearTimeout(timer);
+    video.removeEventListener('emptied', onEmptied);
     if (pendingResume === attempt) pendingResume = null;
   }
 }
