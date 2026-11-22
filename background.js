@@ -47,9 +47,9 @@ async function handleOneVideo(event) {
       try { await chrome.tabs.sendMessage(action.tabId, { type: 'ONE_VIDEO_PAUSE' }); } catch (_) { /* tab gone */ }
     } else {
       let resumed = false;
-      try { resumed = (await chrome.tabs.sendMessage(action.tabId, { type: 'ONE_VIDEO_RESUME' })) === true; } catch (_) { /* tab gone */ }
+      try { resumed = await chrome.tabs.sendMessage(action.tabId, { type: 'ONE_VIDEO_RESUME' }); } catch (_) { /* tab gone */ }
       // It can't play any more (closed, moved off the video): give the next waiting tab its turn.
-      if (!resumed) await handleOneVideo({ type: 'closed', tabId: action.tabId });
+      if (resumed !== true) await handleOneVideo({ type: resumed === 'paused' ? 'paused' : 'closed', tabId: action.tabId });
     }
   }
 }

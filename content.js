@@ -30,16 +30,19 @@ function loadSettings() {
 }
 loadSettings();
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local') loadSettings(); });
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FOCUS_LOST') pauseVideo();
   if (message.type === 'FOCUS_GAINED') resumeVideo();
   if (message.type === 'TUTORIAL_MODE_UPDATED') tutorialMode = !!message.enabled;
   if (message.type === 'SUBSCRIPTION_CLEAN_UPDATED') { subscriptionCleanMode = !!message.enabled; scheduleSubscriptionClean(); }
-  if (message.type === 'AMAZON_CART_STATUS') return Promise.resolve({ found: amazonCartSidebarFound() });
-  if (message.type === 'GET_TAB_STATUS') return Promise.resolve(tabStatus());
-  if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); return Promise.resolve(true); }
-  if (message.type === 'ONE_VIDEO_PAUSE') return Promise.resolve(oneVideoPause());
-  if (message.type === 'ONE_VIDEO_RESUME') return oneVideoResume();
+  if (message.type === 'AMAZON_CART_STATUS') sendResponse({ found: amazonCartSidebarFound() });
+  if (message.type === 'GET_TAB_STATUS') sendResponse(tabStatus());
+  if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); sendResponse(true); }
+  if (message.type === 'ONE_VIDEO_PAUSE') sendResponse(oneVideoPause());
+  if (message.type === 'ONE_VIDEO_RESUME') {
+    oneVideoResume().then(sendResponse, () => sendResponse(false));
+    return true;
+  }
 });
 
 // Relay to page-bridge.js, which runs in the page's world and calls YouTube's player.
@@ -148,6 +151,7 @@ let endedTimer = null;
 // (currentVideoKey). Only that viewing, in that element, may come back.
 let pausedVideo = null;
 let pausedKey = null;
+let pendingResume = null;
 let documentReported = false; // whether this page has told the worker anything yet
 function reportOneVideo(event) {
   if (!oneVideoActive()) return;
@@ -163,6 +167,14 @@ function onMediaEvent(event) {
     return;
   }
   if (video !== reportedVideo) return;
+  // A pause interrupts play() before it can settle. Return it in the resume reply
+  // so the worker can hold this tab before processing other queued events.
+  if (event.type === 'pause' && video.paused && !video.ended &&
+      pendingResume?.video === video && pendingResume.key === currentVideoKey()) {
+    reportedVideo = null;
+    pendingResume.finish('paused');
+    return;
+  }
   if (event.type === 'ended') {
     reportedVideo = null;
     clearTimeout(endedTimer);
@@ -209,6 +221,7 @@ let loadCheckScheduled = false;
 // it. Turned off: drop everything pending, so nothing from before reaches a later session.
 function syncOneVideo() {
   if (!oneVideoActive()) {
+    pendingResume?.finish(false);
     reportedVideo = null; pausedVideo = null; pausedKey = null;
     clearTimeout(endedTimer); endedTimer = null;
     clearTimeout(leftTimer); leftTimer = null;
@@ -238,7 +251,7 @@ function oneVideoPause() {
 // Long enough for a background tab to rebuffer on a slow connection; other tabs' events wait at most this.
 const RESUME_TIMEOUT_MS = 5000;
 async function oneVideoResume() {
-  if (!oneVideoActive()) return false;
+  if (!oneVideoActive() || pendingResume) return false;
   const [video, key] = [pausedVideo, pausedKey];
   pausedVideo = null; pausedKey = null;
   // Not the viewing it paused (another video, left for Home, the element replaced), or it already
@@ -249,21 +262,31 @@ async function oneVideoResume() {
   // (a new start would pause whichever tab began in the meantime).
   reportedVideo = video;
   let timer;
+  const attempt = { video, key, finish: null };
   try {
-    const timeout = new Promise((resolve) => {
+    const interrupted = new Promise((resolve) => {
+      attempt.finish = (result) => {
+        clearTimeout(timer);
+        pendingResume = null;
+        resolve(result);
+      };
+      pendingResume = attempt;
       timer = setTimeout(() => {
+        const stillOwnsPlayback = oneVideoActive() && pendingResume === attempt &&
+          reportedVideo === video && key === currentVideoKey();
         // Cancel the pending play before the worker hands over to another tab.
         if (reportedVideo === video) reportedVideo = null;
-        video.pause();
-        resolve(false);
+        attempt.finish(false);
+        if (stillOwnsPlayback) video.pause();
       }, RESUME_TIMEOUT_MS);
     });
-    return await Promise.race([video.play().then(() => true), timeout]);
+    return await Promise.race([video.play().then(() => true), interrupted]);
   } catch (_) {
     if (reportedVideo === video) reportedVideo = null;
     return false;
   } finally {
     clearTimeout(timer);
+    if (pendingResume === attempt) pendingResume = null;
   }
 }
 

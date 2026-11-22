@@ -97,7 +97,7 @@ test.describe('on', () => {
     });
   }
 
-  test('a stalled resume gives the next waiting video its turn', async ({ context }) => {
+  async function stallResume(context) {
     const { a, b } = await startTwo(context);
     await expect.poll(() => isPlaying(a)).toBe(false);
     const c = await open(context, 'c1');
@@ -116,6 +116,12 @@ test.describe('on', () => {
       video.addEventListener('playing', () => { window.__resumed = true; });
     });
     await c.close();
+    await expect.poll(() => isPlaying(b)).toBe(true); // play requested, media still pending
+    return { a, b, releaseMedia };
+  }
+
+  test('a stalled resume gives the next waiting video its turn', async ({ context }) => {
+    const { a, b, releaseMedia } = await stallResume(context);
     try {
       await expect.poll(() => isPlaying(a), { timeout: 10000 }).toBe(true); // after content.js RESUME_TIMEOUT_MS
       expect(await isPlaying(b)).toBe(false);
@@ -124,6 +130,30 @@ test.describe('on', () => {
     }
     await b.waitForFunction(() => document.querySelector('video').readyState >= HTMLMediaElement.HAVE_FUTURE_DATA);
     expect(await b.evaluate(() => window.__resumed)).toBeUndefined();
+  });
+
+  test('disabling the feature releases a stalled resume without a late pause', async ({ context, popup }) => {
+    const { b, releaseMedia } = await stallResume(context);
+    try {
+      await setSetting(popup, 'oneVideoAtATime', false);
+      await expect.poll(() => sessionState(popup), { timeout: 2000 }).toBeNull();
+      await wait(5000);
+      expect(await isPlaying(b)).toBe(true);
+    } finally {
+      releaseMedia();
+    }
+  });
+
+  test('pausing a pending resume holds that tab and leaves the next video paused', async ({ context, popup }) => {
+    const { a, b, releaseMedia } = await stallResume(context);
+    try {
+      await pauseVideo(b);
+      const held = await tabId(popup, 'b1');
+      await expect.poll(() => sessionState(popup)).toMatchObject({ current: null, held });
+      expect(await isPlaying(a)).toBe(false);
+    } finally {
+      releaseMedia();
+    }
   });
 
   test('navigating the playing tab off YouTube resumes the first', async ({ context }) => {
