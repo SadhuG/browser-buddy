@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- One video at a time (YouTube, off by default). Starting a video in one tab pauses the video playing in another. When the new video ends, its tab closes, or you leave it for another page, Browser Buddy tries to resume a video it paused. That tab must still show the same viewing of the same video (not reloaded or moved to another video), and the video must be able to play with sound. Otherwise, Browser Buddy tries the next waiting tab. Pausing a video yourself resumes nothing, even while an automatic resume is buffering. Turning the feature off clears any pending resume timeout. With three or more videos, choose whether the previous video or the first one comes back. Muted videos don't count, and Tutorial mode takes over while it's on.
+
+### Fixed
+
+- Captions always on now show text in a YouTube tab that hadn't started playing yet, such as a video opened in a new tab or a tab you switch back to. Before, the captions button read on but no captions appeared. Browser Buddy now waits until the video starts before turning captions on or restyling them.
+
 ## v1.3.0
 
 Release: 2026-10-30

@@ -25,19 +25,24 @@ function loadSettings() {
     settings = BrowserBuddy.settings.normalizeSettings(values);
     ({ playbackSpeed, tutorialMode, subscriptionCleanMode, hideAmazonCart } = settings);
     sendSettingsToPage();
-    applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide();
+    applySettings(); scheduleSubscriptionClean(); scheduleAmazonCartHide(); syncOneVideo();
   });
 }
 loadSettings();
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local') loadSettings(); });
-chrome.runtime.onMessage.addListener((message) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FOCUS_LOST') pauseVideo();
   if (message.type === 'FOCUS_GAINED') resumeVideo();
   if (message.type === 'TUTORIAL_MODE_UPDATED') tutorialMode = !!message.enabled;
   if (message.type === 'SUBSCRIPTION_CLEAN_UPDATED') { subscriptionCleanMode = !!message.enabled; scheduleSubscriptionClean(); }
-  if (message.type === 'AMAZON_CART_STATUS') return Promise.resolve({ found: amazonCartSidebarFound() });
-  if (message.type === 'GET_TAB_STATUS') return Promise.resolve(tabStatus());
-  if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); return Promise.resolve(true); }
+  if (message.type === 'AMAZON_CART_STATUS') sendResponse({ found: amazonCartSidebarFound() });
+  if (message.type === 'GET_TAB_STATUS') sendResponse(tabStatus());
+  if (message.type === 'CLEAR_TOUCH') { clearTouch(message.setting); sendResponse(true); }
+  if (message.type === 'ONE_VIDEO_PAUSE') sendResponse(oneVideoPause());
+  if (message.type === 'ONE_VIDEO_RESUME') {
+    oneVideoResume().then(sendResponse, () => sendResponse(false));
+    return true;
+  }
 });
 
 // Relay to page-bridge.js, which runs in the page's world and calls YouTube's player.
@@ -134,6 +139,175 @@ function applySettings() {
     video.playbackRate = playbackSpeed;
   }
   speedTracker.applied('speed', playbackSpeed, Date.now());
+}
+
+// One video at a time: report this tab's audible playback to the service worker, which pauses
+// and resumes tabs (lib/one-video.js). Tutorial mode wins: while it's on, this stands down.
+const oneVideoActive = () => isYoutubePage && settings.oneVideoAtATime && !settings.tutorialMode;
+const isAudible = (video) => !video.muted && video.volume > 0;
+let reportedVideo = null; // the video this tab reported as started; null when not playing
+let endedTimer = null;
+// What Browser Buddy paused, if it paused a playing video: that element and its viewing
+// (currentVideoKey). Only that viewing, in that element, may come back.
+let pausedVideo = null;
+let pausedKey = null;
+let pendingResume = null;
+let documentReported = false; // whether this page has told the worker anything yet
+function reportOneVideo(event) {
+  if (!oneVideoActive()) return;
+  documentReported = true;
+  chrome.runtime.sendMessage({ type: 'ONE_VIDEO_EVENT', event }).catch(() => {});
+}
+function onMediaEvent(event) {
+  const video = event.target;
+  if (!(video instanceof HTMLVideoElement) || !oneVideoActive()) return;
+  if ((event.type === 'playing' || event.type === 'volumechange') && !video.paused && isAudible(video)) {
+    clearTimeout(endedTimer); endedTimer = null;
+    if (reportedVideo !== video) { reportedVideo = video; reportOneVideo('started'); }
+    return;
+  }
+  if (video !== reportedVideo) return;
+  // A pause interrupts play() before it can settle. Return it in the resume reply
+  // so the worker can hold this tab before processing other queued events.
+  if (event.type === 'pause' && video.paused && !video.ended &&
+      pendingResume?.video === video && pendingResume.key === currentVideoKey()) {
+    reportedVideo = null;
+    if (isVideoPage()) pendingResume.finish('paused');
+    else {
+      clearTimeout(leftTimer); leftTimer = null;
+      pendingResume.checkMiniPlayer();
+    }
+    return;
+  }
+  if (event.type === 'ended') {
+    reportedVideo = null;
+    clearTimeout(endedTimer);
+    // Autoplay, a playlist or an ad handing over plays again in this tab within the grace.
+    endedTimer = setTimeout(() => { endedTimer = null; if (!reportedVideo) reportOneVideo('finished'); }, BrowserBuddy.oneVideo.ENDED_GRACE_MS);
+  } else if ((event.type === 'pause' && !video.ended) || (event.type === 'volumechange' && !isAudible(video))) {
+    // Off a video page this is the mini-player, or the player going away: the left check decides.
+    if (!isVideoPage()) { scheduleLeftCheck(); return; }
+    reportedVideo = null;
+    reportOneVideo('paused');
+  }
+}
+if (isYoutubePage) ['playing', 'pause', 'ended', 'volumechange'].forEach((type) => document.addEventListener(type, onMediaEvent, true));
+// Leaving the video page in the tab (Back, the logo, Home, search) unloads the player with no
+// pause event, and Back fires no yt-navigate-start. Closing the mini-player fires pause, then
+// unloads it; pausing the mini-player fires only pause and keeps the video loaded (all checked
+// live 2026-11-22). So a moment after landing off a video page, or after a pause there: still
+// playing is the mini-player (nothing to report), loaded but quiet is a pause, and an unloaded
+// player means the tab is done with its video, as if closed.
+const LEFT_CHECK_MS = 1000;
+const isVideoPage = () => /^\/(watch$|shorts\/|live\/)/.test(location.pathname);
+const isLoaded = (video) => video && video.isConnected && video.readyState > HTMLMediaElement.HAVE_NOTHING;
+let leftTimer = null;
+function scheduleLeftCheck() {
+  clearTimeout(leftTimer);
+  leftTimer = setTimeout(() => {
+    leftTimer = null;
+    if (!oneVideoActive() || isVideoPage()) return;
+    const video = reportedVideo;
+    const loaded = isLoaded(video);
+    if (loaded && !video.paused && isAudible(video)) return;
+    reportedVideo = null;
+    clearTimeout(endedTimer); endedTimer = null;
+    reportOneVideo(loaded ? 'paused' : 'left');
+  }, LEFT_CHECK_MS);
+}
+function onYoutubeNavigated() {
+  clearTimeout(leftTimer); leftTimer = null;
+  if (oneVideoActive() && !isVideoPage()) scheduleLeftCheck();
+}
+if (isYoutubePage) document.addEventListener('yt-navigate-finish', onYoutubeNavigated);
+const LOAD_CHECK_MS = 3000;
+let loadCheckScheduled = false;
+// Turned on (or Tutorial mode off) while a video already plays: report it, so the next start pauses
+// it. Turned off: drop everything pending, so nothing from before reaches a later session.
+function syncOneVideo() {
+  if (!oneVideoActive()) {
+    pendingResume?.finish(false);
+    reportedVideo = null; pausedVideo = null; pausedKey = null;
+    clearTimeout(endedTimer); endedTimer = null;
+    clearTimeout(leftTimer); leftTimer = null;
+    return;
+  }
+  // A new page in this tab (a reload, a link) ends whatever its old page was playing. If this page
+  // hasn't started anything soon, tell the worker, so a video waiting on that old page comes back.
+  if (!loadCheckScheduled) {
+    loadCheckScheduled = true;
+    setTimeout(() => { if (!documentReported) reportOneVideo('left'); }, LOAD_CHECK_MS);
+  }
+  const playing = [...document.querySelectorAll('video')].find((v) => !v.paused && isAudible(v));
+  if (playing && playing !== reportedVideo) { reportedVideo = playing; reportOneVideo('started'); }
+}
+function oneVideoPause() {
+  const video = reportedVideo || [...document.querySelectorAll('video')].find((v) => !v.paused && isAudible(v));
+  // The worker already moved on to the other tab: this pause isn't the user's.
+  reportedVideo = null;
+  clearTimeout(endedTimer); endedTimer = null;
+  // Only a video Browser Buddy actually stopped may come back later.
+  const stopping = video && !video.paused;
+  pausedVideo = stopping ? video : null;
+  pausedKey = stopping ? currentVideoKey() : null;
+  if (stopping) video.pause();
+  return true;
+}
+// Long enough for a background tab to rebuffer on a slow connection; other tabs' events wait at most this.
+const RESUME_TIMEOUT_MS = 5000;
+async function oneVideoResume() {
+  if (!oneVideoActive() || pendingResume) return false;
+  const [video, key] = [pausedVideo, pausedKey];
+  pausedVideo = null; pausedKey = null;
+  // Not the viewing it paused (another video, left for Home, the element replaced), or it already
+  // ended: the worker hands over to the next waiting tab instead.
+  if (!video || !video.isConnected || key !== currentVideoKey() || video.ended || !isAudible(video)) return false;
+  if (!video.paused) return true;
+  // The worker already counts this tab as playing, so its own playing event isn't a new start
+  // (a new start would pause whichever tab began in the meantime).
+  reportedVideo = video;
+  let timer;
+  let checkingMiniPlayer = false;
+  const onEmptied = () => attempt.finish(false);
+  const attempt = {
+    video, key, finish: null,
+    checkMiniPlayer() {
+      checkingMiniPlayer = true;
+      clearTimeout(timer);
+      video.addEventListener('emptied', onEmptied, { once: true });
+      timer = setTimeout(() => attempt.finish(isLoaded(video) ? 'paused' : false), LEFT_CHECK_MS);
+    },
+  };
+  try {
+    const interrupted = new Promise((resolve) => {
+      attempt.finish = (result) => {
+        clearTimeout(timer);
+        pendingResume = null;
+        resolve(result);
+      };
+      pendingResume = attempt;
+      timer = setTimeout(() => {
+        const stillOwnsPlayback = oneVideoActive() && pendingResume === attempt &&
+          reportedVideo === video && key === currentVideoKey();
+        // Cancel the pending play before the worker hands over to another tab.
+        if (reportedVideo === video) reportedVideo = null;
+        attempt.finish(false);
+        if (stillOwnsPlayback) video.pause();
+      }, RESUME_TIMEOUT_MS);
+    });
+    const playing = video.play().then(() => true, (error) => {
+      if (checkingMiniPlayer) return interrupted;
+      throw error;
+    });
+    return await Promise.race([playing, interrupted]);
+  } catch (_) {
+    if (reportedVideo === video) reportedVideo = null;
+    return false;
+  } finally {
+    clearTimeout(timer);
+    video.removeEventListener('emptied', onEmptied);
+    if (pendingResume === attempt) pendingResume = null;
+  }
 }
 
 function isSubscriptions() { try { return new URL(location.href).pathname === '/feed/subscriptions'; } catch (_) { return false; } }

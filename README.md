@@ -12,7 +12,7 @@ It is designed as a toolbar popup for Chrome and Microsoft Edge, with a monospac
 
 ### YouTube
 
-The YouTube tab shows playback speed, one summary row each for Resolution, Audio and Captions, and the Tutorial mode and Subscription clean switches. Each row shows its current setting; select it to open its screen, and **← YouTube** to come back.
+The YouTube tab shows playback speed, one summary row each for Resolution, Audio and Captions, and the Tutorial mode, One video at a time and Subscription clean switches. Each row shows its current setting; select it to open its screen, and **← YouTube** to come back.
 
 - Playback speed from 0.25× to 4×, with quick presets. A speed you pick in YouTube's own player holds for that video; the next video uses Browser Buddy's speed again.
 - **Resolution** screen: a preferred resolution for every video, from 144p to 4K or Highest available. If a video doesn't offer it, the closest lower resolution plays. In the miniplayer (two steps lower) and on battery below 20% (one step lower), Browser Buddy plays a little lower automatically. A quality you pick in YouTube's own menu holds for that video.
@@ -21,6 +21,7 @@ The YouTube tab shows playback speed, one summary row each for Resolution, Audio
 - **Audio** screen: with **Choose audio track** on, originals in your languages play as-is. Other videos play your first available dub, preferring human dubs over AI dubs, or the original with captions in your language when there's no dub. **My languages** (English and Hindi by default) is a ranked list you can add to, reorder with the up and down buttons, and trim; it also picks caption languages. A track you pick in YouTube's own menu holds for that video.
 - Notes about the video in the active tab: when you changed a setting in YouTube's player, a blue note says so ("This video: 1.5× set in player") with **Use Browser Buddy setting** to switch back. A change lasts while you watch that video, including in the miniplayer; leaving it (for Home or a Short) and coming back starts it fresh. Grey notes tell you when Browser Buddy lowered the resolution on its own ("720p on battery") or when a video can't follow a setting ("This video tops out at 1080p", "No other audio tracks on this video").
 - Global Tutorial Mode. When enabled, a YouTube video automatically pauses when its tab or browser window loses focus, and resumes only if Browser Buddy paused it.
+- **One video at a time** (off by default). Starting a video that has sound in one YouTube tab pauses the video playing in another. When the new video ends, or you close its tab, go back from it to another YouTube page (Home, search results, Subscriptions) or leave YouTube in it, a waiting video can pick up again. Closing its mini-player, reloading its tab without playing anything, or going to YouTube Music in it does the same. Browser Buddy only resumes a video it paused if that tab still shows the same viewing of that video (not reloaded or moved to another video) and it can play with sound. Otherwise, it tries the next waiting tab. A video that keeps playing in YouTube's mini-player still counts as playing, and pausing the mini-player counts as pausing it yourself. If it ends and something plays again in that tab within a few seconds (autoplay, a playlist, an ad), nothing resumes. Pausing a video yourself never brings another back, even if you then close its tab or go back from it, and a video you paused stays paused. This also applies while a video is buffering during an automatic resume. Turning the feature off stops it from pausing a video whose resume is still buffering. With three or more videos, **When it ends or its tab closes, resume** picks **Previous video** (the most recently paused comes back first) or **First video** (the first one you were watching comes back; the others wait their turn). Muted videos, such as hover previews on the YouTube home page, don't count. While Tutorial mode is on, it is in charge and this switch is dimmed.
 - Global Subscription Clean. On the YouTube Subscriptions feed, hides Shorts shelves and the "Most relevant" shelf. Shorts shelves are recognized by page structure in any language; other shelves and videos are left alone.
 - Settings can be changed from any browser tab. They are only applied on relevant YouTube pages; YouTube Music is excluded and keeps its own playback speed.
 
@@ -72,8 +73,9 @@ Reload the extension on that page after changing source files. Refresh any alrea
 | `lib/caption-track.js` | Chooses the caption track from My languages. |
 | `lib/audio-track.js` | Reads YouTube's audio tracks and chooses one from My languages. |
 | `lib/presets.js` | Creates, renames, edits, deletes and resets caption presets. |
+| `lib/one-video.js` | Decides which YouTube tab to pause when another starts, and which paused tab comes back. |
 | `lib/touch.js` | Tells Browser Buddy's own changes apart from changes you make in YouTube's player, so your change holds for that video. |
-| `background.js` | Detects tab/window focus changes and notifies YouTube pages. |
+| `background.js` | Detects tab/window focus changes and notifies YouTube pages; coordinates One video at a time across tabs. |
 | `content.js` | Applies YouTube controls and the Amazon cart-sidebar preference, and relays settings to `page-bridge.js`. |
 | `page-bridge.js` | Runs inside YouTube pages to reach YouTube's own player controls; talks to `content.js` through window messages. |
 | `package.json`, `playwright.config.js`, `playwright.live.config.js`, `tests/` | Dev-only test tooling. The extension never loads these. |
@@ -82,11 +84,11 @@ Reload the extension on that page after changing source files. Refresh any alrea
 
 Browser Buddy uses:
 
-- `tabs` to list, focus, create, and close tabs for the duplicate-tab tool.
-- `storage` to save playback speed and global preferences locally in the browser. The theme choice is kept in the popup's own local storage.
+- `tabs` to list, focus, create, and close tabs for the duplicate-tab tool, and to notice when a YouTube tab closes or leaves YouTube for One video at a time.
+- `storage` to save playback speed and global preferences locally in the browser. One video at a time keeps its list of paused tabs in session storage, which the browser clears when it closes. The theme choice is kept in the popup's own local storage.
 - YouTube and Amazon storefront host access only to run the helper on those pages. YouTube Music is excluded from the helper.
 
-The extension does not send browsing data or settings to a remote service. Tab URLs and titles are read only while the popup is open and are used locally to render duplicate groups.
+The extension does not send browsing data or settings to a remote service. The popup reads tab URLs and titles while it is open to show duplicate groups. The background worker also reads tab URLs to recognize YouTube tabs and detect when they leave YouTube, even while the popup is closed. This information stays in your browser.
 
 ## Development notes
 
@@ -102,7 +104,7 @@ npm test
 
 `npm run test:live` runs `tests/live/` against real youtube.com videos (listed in `tests/live/videos.js`). It needs the network and is slower and flakier because of ads, so it runs locally only, not in CI. YouTube behavior the e2e tests can't capture is tested against a stand-in player, `tests/fixtures/youtube/stub-player.html`.
 
-Duplicate-tab removal, bulk confirmation, Undo, the Amazon cart sidebar toggle, and Subscription Clean are covered automatically. Amazon and YouTube tests run against trimmed, anonymized pages captured from the live sites in `tests/fixtures/`. After reloading the unpacked extension, still check playback speed and Tutorial Mode on a YouTube video by hand, and glance at the live Subscriptions feed with Subscription Clean on.
+Duplicate-tab removal, bulk confirmation, Undo, the Amazon cart sidebar toggle, and Subscription Clean are covered automatically. Amazon and YouTube tests run against trimmed, anonymized pages captured from the live sites in `tests/fixtures/`. After reloading the unpacked extension, still check playback speed, Tutorial Mode and One video at a time (two real videos in two tabs) on YouTube by hand, and glance at the live Subscriptions feed with Subscription Clean on.
 
 ## Known limitations
 

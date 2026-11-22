@@ -1,4 +1,4 @@
-const { test, expect, openStubVideo, tabStatus, setSetting, clearTouch } = require('./fixtures');
+const { test, expect, openStubVideo, waitForApplier, tabStatus, setSetting, clearTouch } = require('./fixtures');
 
 const T = (languageCode, kind = '') => ({ languageCode, kind, languageName: languageCode, vss_id: `${kind === 'asr' ? 'a' : ''}.${languageCode}` });
 const L = (languageCode) => ({ languageCode, languageName: languageCode });
@@ -111,3 +111,16 @@ test('Use Browser Buddy setting right after a player click restores captions', a
   await expect.poll(() => isOn(page)).toBe(true);
   expect((await status(popup, page)).touched?.captions).toBeUndefined();
 });
+
+// A tab that hasn't played yet (opened in the background, or a tab you return to) has no
+// caption token from YouTube yet: captions switched on then download empty, so the button
+// reads on but no text ever shows (measured 2026-11-02). Wait until the video starts.
+for (const [name, playerState] of [['unstarted', -1], ['cued', 5]]) {
+  test(`captions wait until a ${name} video starts playing`, async ({ context, popup }) => {
+    const page = await open(context, popup, 'on', { ...captions([T('es'), T('en', 'asr')]), playerState });
+    await waitForApplier(page, 'captions');
+    expect(await captionCalls(page)).toEqual([]);
+    await page.evaluate(() => window.__bbStub.setPlayerState(1));
+    await expect.poll(() => trackSet(page)).toContainEqual(expect.objectContaining({ languageCode: 'en', kind: 'asr' }));
+  });
+}

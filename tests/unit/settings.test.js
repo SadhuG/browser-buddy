@@ -95,3 +95,11 @@ test('the result is a fresh copy', () => {
   assert.deepEqual(DEFAULT_SETTINGS, defaults);
   assert.deepEqual(normalizeSettings({}), defaults);
 });
+
+test('one video at a time is off and resumes the previous video by default', () => {
+  assert.equal(normalizeSettings({}).oneVideoAtATime, false);
+  assert.equal(normalizeSettings({}).oneVideoResume, 'previous');
+  assert.equal(normalizeSettings({ oneVideoAtATime: 1 }).oneVideoAtATime, true);
+  assert.equal(normalizeSettings({ oneVideoResume: 'first' }).oneVideoResume, 'first');
+  assert.equal(normalizeSettings({ oneVideoResume: 'x' }).oneVideoResume, 'previous');
+});

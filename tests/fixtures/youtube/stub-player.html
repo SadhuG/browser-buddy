@@ -12,6 +12,19 @@
 (() => {
   const config = window.__bbStubConfig || {};
   const player = document.getElementById('movie_player');
+  // Real media when config.media is set ({ seconds }): a silent 8 kHz mono WAV, so the
+  // <video> really plays, pauses and ends (one video at a time).
+  if (config.media) {
+    const rate = 8000, samples = Math.round((config.media.seconds ?? 30) * rate);
+    const view = new DataView(new ArrayBuffer(44 + samples));
+    const ascii = (at, text) => [...text].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)));
+    ascii(0, 'RIFF'); view.setUint32(4, 36 + samples, true); ascii(8, 'WAVEfmt ');
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true); view.setUint32(28, rate, true); view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+    ascii(36, 'data'); view.setUint32(40, samples, true);
+    for (let i = 0; i < samples; i++) view.setUint8(44 + i, 128);
+    player.querySelector('video').src = URL.createObjectURL(new Blob([view.buffer], { type: 'audio/wav' }));
+  }
   const stub = window.__bbStub = {
     calls: [],
     state: { videoId: new URLSearchParams(location.search).get('v') || 'stub1' },
@@ -21,7 +34,10 @@
   stub.callsTo = (name) => stub.calls.filter((call) => call[0] === name);
 
   define('getVideoData', () => ({ video_id: stub.state.videoId }));
-  define('getPlayerState', () => 1);
+  // 1 playing; -1 unstarted and 5 cued, as in a background tab that hasn't played yet.
+  let playerState = config.playerState ?? 1;
+  define('getPlayerState', () => playerState);
+  stub.setPlayerState = (value) => { playerState = value; };
 
   // Quality. A pick in YouTube's own menu also moves the user preference; Browser Buddy's
   // setPlaybackQualityRange does not (findings Q3).

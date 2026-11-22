@@ -7,7 +7,8 @@ const test = base.extend({
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext('', {
       channel: 'chromium',
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+      // Tests start videos with play() from page scripts, which has no user gesture.
+      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`, '--autoplay-policy=no-user-gesture-required'],
     });
     await context.route('https://dupes.test/**', (route) =>
       route.fulfill({ contentType: 'text/html', body: `<title>${new URL(route.request().url()).pathname}</title>` }));
@@ -56,6 +57,26 @@ async function openStubVideo(context, { id = 'stub1', config = {}, host = 'www.y
   return page;
 }
 
+async function waitForApplier(page, name) {
+  await page.waitForFunction((name) => {
+    const bridge = window.BrowserBuddy?.bridge;
+    const applier = bridge?.appliers.find((entry) => entry.name === name);
+    if (!applier) return false;
+    const apply = applier.apply;
+    let ran = false;
+    applier.apply = (...args) => {
+      ran = true;
+      return apply.apply(applier, args);
+    };
+    try {
+      bridge.tick();
+      return ran;
+    } finally {
+      applier.apply = apply;
+    }
+  }, name);
+}
+
 // Send a message from the popup to one tab: a Page, an exact URL, or (default)
 // the first youtube.com tab. Resolves to null when the tab has no content script.
 function messageTab(popup, message, target) {
@@ -78,4 +99,4 @@ async function openPopupForTab(popup, page) {
   return popup;
 }
 
-module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, tabStatus, clearTouch, openPopupForTab, messageTab };
+module.exports = { test, expect, openPages, dupeTabs, serveFixture, setSetting, openStubVideo, waitForApplier, tabStatus, clearTouch, openPopupForTab, messageTab };

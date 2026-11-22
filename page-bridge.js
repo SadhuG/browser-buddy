@@ -197,6 +197,11 @@
   // Captions on/off and language. ctx.forceCaptionsLanguage (set by the audio applier when a
   // foreign video has no dub in My languages) turns captions on in that language whatever the mode.
   const CAPTION_LOAD_TRIES = 5;
+  // YouTube downloads captions with a token it only has once the video is under way. Showing
+  // captions earlier (a background tab, a tab you come back to) downloads them without it and
+  // gets an empty file: the button reads on but no text ever shows (measured 2026-11-02).
+  // So both caption appliers wait while the video is unstarted (-1) or cued (5).
+  const hasStarted = (player) => ![-1, 5].includes(player.getPlayerState());
   function captionKey(player) {
     const on = player.isSubtitlesOn();
     const track = on ? player.getOption('captions', 'track') : null;
@@ -206,7 +211,7 @@
     name: 'captions',
     apply(player, ctx) {
       const { settings, tracker, now, status, state } = ctx;
-      if (status.surface === 'miniplayer') return;
+      if (status.surface === 'miniplayer' || !hasStarted(player)) return;
       const force = ctx.forceCaptionsLanguage;
       const mode = force ? 'on' : settings.captionsMode;
       if (mode === 'youtube') return;
@@ -271,7 +276,7 @@
   appliers.push({
     name: 'captionStyle',
     apply(player, { settings, tracker, now, status, state, userInitiated }) {
-      if (status.surface === 'miniplayer' || !settings.captionStyleEnabled) return;
+      if (status.surface === 'miniplayer' || !settings.captionStyleEnabled || !hasStarted(player)) return;
       const raw = player.getSubtitlesUserSettings();
       if (!raw) return;
       const current = BB.captionStyle.fromYoutubeSettings(raw);
